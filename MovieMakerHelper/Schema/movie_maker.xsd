@@ -1,0 +1,224 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema id="NewDataSet" xmlns="" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+  <xs:element name="BoundProperties">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="BoundPropertyBool" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:attribute name="Name" type="xs:string" />
+            <xs:attribute name="Value" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="BoundPropertyFloatSet" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="BoundPropertyFloatElement" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="Value" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="Name" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="BoundPropertyStringSet" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="BoundPropertyStringElement" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="Value" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute name="Name" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="BoundPropertyFloat" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:attribute name="Name" type="xs:string" />
+            <xs:attribute name="Value" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="BoundPropertyInt" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:attribute name="Name" type="xs:string" />
+            <xs:attribute name="Value" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="BoundPropertyString" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:attribute name="Name" type="xs:string" />
+            <xs:attribute name="Value" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="Transitions">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="ShaderEffect" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="BoundProperties" type="xs:string" minOccurs="0" msdata:Ordinal="0" />
+            </xs:sequence>
+            <xs:attribute name="effectTemplateID" type="xs:string" />
+            <xs:attribute name="duration" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="ShapeEffect" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="BoundProperties" type="xs:string" minOccurs="0" msdata:Ordinal="0" />
+            </xs:sequence>
+            <xs:attribute name="effectTemplateID" type="xs:string" />
+            <xs:attribute name="duration" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="Project">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MediaItems" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="MediaItem" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="id" type="xs:string" />
+                  <xs:attribute name="filePath" type="xs:string" />
+                  <xs:attribute name="arWidth" type="xs:string" />
+                  <xs:attribute name="arHeight" type="xs:string" />
+                  <xs:attribute name="duration" type="xs:string" />
+                  <xs:attribute name="songTitle" type="xs:string" />
+                  <xs:attribute name="songArtist" type="xs:string" />
+                  <xs:attribute name="songAlbum" type="xs:string" />
+                  <xs:attribute name="songCopyrightUrl" type="xs:string" />
+                  <xs:attribute name="songArtistUrl" type="xs:string" />
+                  <xs:attribute name="songAudioFileUrl" type="xs:string" />
+                  <xs:attribute name="stabilizationMode" type="xs:string" />
+                  <xs:attribute name="mediaItemType" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="Extents" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="TitleClip" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Transitions" type="xs:string" minOccurs="0" msdata:Ordinal="1" />
+                    <xs:element name="Effects" minOccurs="0" maxOccurs="1">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="TextEffect" minOccurs="0" maxOccurs="unbounded">
+                            <xs:complexType>
+                              <xs:sequence>
+                                <xs:element ref="BoundProperties" minOccurs="0" maxOccurs="1" />
+                              </xs:sequence>
+                              <xs:attribute name="effectTemplateID" type="xs:string" />
+                              <xs:attribute name="TextScriptId" type="xs:string" />
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element ref="BoundProperties" minOccurs="0" maxOccurs="1" />
+                  </xs:sequence>
+                  <xs:attribute name="extentID" type="xs:string" />
+                  <xs:attribute name="gapBefore" type="xs:string" />
+                  <xs:attribute name="duration" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="VideoClip" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Effects" type="xs:string" minOccurs="0" msdata:Ordinal="0" />
+                    <xs:element ref="Transitions" minOccurs="0" maxOccurs="1" />
+                    <xs:element ref="BoundProperties" minOccurs="0" maxOccurs="1" />
+                  </xs:sequence>
+                  <xs:attribute name="extentID" type="xs:string" />
+                  <xs:attribute name="gapBefore" type="xs:string" />
+                  <xs:attribute name="mediaItemID" type="xs:string" />
+                  <xs:attribute name="inTime" type="xs:string" />
+                  <xs:attribute name="outTime" type="xs:string" />
+                  <xs:attribute name="speed" type="xs:string" />
+                  <xs:attribute name="stabilizationMode" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="ImageClip" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Effects" type="xs:string" minOccurs="0" msdata:Ordinal="0" />
+                    <xs:element ref="Transitions" minOccurs="0" maxOccurs="1" />
+                    <xs:element ref="BoundProperties" minOccurs="0" maxOccurs="1" />
+                  </xs:sequence>
+                  <xs:attribute name="extentID" type="xs:string" />
+                  <xs:attribute name="gapBefore" type="xs:string" />
+                  <xs:attribute name="mediaItemID" type="xs:string" />
+                  <xs:attribute name="duration" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="ExtentSelector" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Effects" type="xs:string" minOccurs="0" msdata:Ordinal="0" />
+                    <xs:element name="Transitions" type="xs:string" minOccurs="0" msdata:Ordinal="1" />
+                    <xs:element name="BoundProperties" type="xs:string" minOccurs="0" msdata:Ordinal="2" />
+                    <xs:element name="ExtentRefs" minOccurs="0" maxOccurs="1">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="ExtentRef" minOccurs="0" maxOccurs="unbounded">
+                            <xs:complexType>
+                              <xs:attribute name="id" type="xs:string" />
+                            </xs:complexType>
+                          </xs:element>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                  <xs:attribute name="extentID" type="xs:string" />
+                  <xs:attribute name="gapBefore" type="xs:string" />
+                  <xs:attribute name="primaryTrack" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="BoundPlaceholders" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="BoundPlaceholder" minOccurs="0" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:attribute name="placeholderID" type="xs:string" />
+                  <xs:attribute name="extentID" type="xs:string" />
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element ref="BoundProperties" minOccurs="0" maxOccurs="1" />
+        <xs:element name="ThemeOperationLog" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="MonolithicThemeOperations" type="xs:string" minOccurs="0" msdata:Ordinal="0" />
+            </xs:sequence>
+            <xs:attribute name="themeID" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="AudioDuckingProperties" minOccurs="0" maxOccurs="1">
+          <xs:complexType>
+            <xs:attribute name="emphasisPlaceholderID" type="xs:string" />
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="name" type="xs:string" />
+      <xs:attribute name="themeId" type="xs:string" />
+      <xs:attribute name="version" type="xs:string" />
+      <xs:attribute name="templateID" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
