@@ -42,7 +42,7 @@ namespace MovieMakerHelper
         {
             var mediaItems = new List<ProjectMediaItem>();
             var mediaItemCounter = 1;
-            var extentCounter = 1;
+            var extentCounter = 5;
             var videoClips = new List<ProjectExtentsVideoClip>();
             var titleClips = new List<ProjectExtentsVideoClip>();
             var videoExtentRefs = new List<ProjectExtentsExtentSelectorExtentRef>();
@@ -53,6 +53,7 @@ namespace MovieMakerHelper
             {
                 var filesForDate = files[dateKey].OrderBy(f => GetActualFileDateTime(f));
 
+                var isFirst = true;
 
                 foreach (var file in filesForDate)
                 {
@@ -92,6 +93,17 @@ namespace MovieMakerHelper
                         Effects = string.Empty,
                         Transitions = new Transitions()
                     };
+
+                    if (isFirst)
+                    {
+                        //add fade in
+                        //add date heading?
+                        isFirst = false;
+                    }
+                    else
+                    {
+                        //add diagonal transition
+                    }
 
                     videoClips.Add(videoClip);
 
