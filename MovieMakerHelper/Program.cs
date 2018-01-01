@@ -1,4 +1,5 @@
-﻿using Shell32;
+﻿using Microsoft.DirectX.AudioVideoPlayback;
+using Shell32;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -19,8 +20,8 @@ namespace MovieMakerHelper
         {
 
             //var project = new Project() { name = "Test", themeId = "0", version = "65540", templateID = "SimpleProjectTemplate" };
-            var minDate = new DateTime(2004, 1, 1);
-            var maxDate = new DateTime(2005, 1, 1);
+            var minDate = new DateTime(2005, 1, 1);
+            var maxDate = new DateTime(2006, 1, 1);
             var files = CrawlFileSystem("G:\\", minDate, maxDate);
 
             var project = GenerateDefaultProject($"{minDate:yyyyMMdd} to {maxDate:yyyyMMdd}");
@@ -55,13 +56,15 @@ namespace MovieMakerHelper
 
                 foreach (var file in filesForDate)
                 {
+                    var videoDetails = GetVideoDetails(file);
+
                     var mediaItem = new ProjectMediaItem
                     {
                         id = $"{mediaItemCounter}",
                         filePath = file.FullName,
-                        arWidth = "1920", //TODO
-                        arHeight = "1080", //TODO
-                        duration = GetVideoDuration(file).ToString(), //TODO
+                        arWidth = videoDetails.Width.ToString(), //TODO
+                        arHeight = videoDetails.Height.ToString(), //TODO
+                        duration = videoDetails.Duration.ToString(), //TODO
                         stabilizationMode = "0",
                         mediaItemType = "1",
                         songTitle = string.Empty,
@@ -153,15 +156,17 @@ namespace MovieMakerHelper
         }
 
         [STAThread]
-        private static double GetVideoDuration(FileInfo fileInfo)
+        private static VideoDetails GetVideoDetails(FileInfo file)
         {
-            IShellDispatch6 shl = new Shell();
-            var fldr = shl.NameSpace(fileInfo.DirectoryName);
-            var itm = fldr.ParseName(fileInfo.Name);
+            using(var video = new Video(file.FullName, false)){
 
-            var propValue = fldr.GetDetailsOf(itm, 27);
-
-            return TimeSpan.Parse(propValue).TotalSeconds;
+                return new VideoDetails
+                {
+                    Duration = video.Duration,
+                    Height = video.Size.Height,
+                    Width = video.Size.Width
+                };
+            }
         }
 
         private static BoundProperties GenerateDefaultVideoBoundProperties()
@@ -369,5 +374,12 @@ namespace MovieMakerHelper
 
             return project;
         }
+    }
+
+    class VideoDetails
+    {
+        public double Duration { get; set; }
+        public int Height { get; set; }
+        public int Width { get; set; }
     }
 }
