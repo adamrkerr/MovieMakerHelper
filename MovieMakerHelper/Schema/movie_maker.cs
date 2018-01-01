@@ -888,7 +888,22 @@ namespace MovieMakerHelper {
         private string gapBeforeField;
         
         private string durationField;
-        
+
+        /// <remarks/>
+        [System.Xml.Serialization.XmlArrayAttribute(Form = System.Xml.Schema.XmlSchemaForm.Unqualified)]
+        [System.Xml.Serialization.XmlArrayItemAttribute("TextEffect", Form = System.Xml.Schema.XmlSchemaForm.Unqualified, IsNullable = false)]
+        public ProjectExtentsTitleClipTextEffect[] Effects
+        {
+            get
+            {
+                return this.effectsField;
+            }
+            set
+            {
+                this.effectsField = value;
+            }
+        }
+
         /// <remarks/>
         [System.Xml.Serialization.XmlElementAttribute(Form=System.Xml.Schema.XmlSchemaForm.Unqualified)]
         public string Transitions {
@@ -899,19 +914,7 @@ namespace MovieMakerHelper {
                 this.transitionsField = value;
             }
         }
-        
-        /// <remarks/>
-        [System.Xml.Serialization.XmlArrayAttribute(Form=System.Xml.Schema.XmlSchemaForm.Unqualified)]
-        [System.Xml.Serialization.XmlArrayItemAttribute("TextEffect", Form=System.Xml.Schema.XmlSchemaForm.Unqualified, IsNullable=false)]
-        public ProjectExtentsTitleClipTextEffect[] Effects {
-            get {
-                return this.effectsField;
-            }
-            set {
-                this.effectsField = value;
-            }
-        }
-        
+                
         /// <remarks/>
         public BoundProperties BoundProperties {
             get {

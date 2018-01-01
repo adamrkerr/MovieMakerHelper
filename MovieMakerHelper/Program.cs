@@ -11,7 +11,7 @@ using System.Xml.Serialization;
 
 namespace MovieMakerHelper
 {
- 
+
     class Program
     {
 
@@ -30,7 +30,7 @@ namespace MovieMakerHelper
 
             var deserializer = new XmlSerializer(typeof(Project));
 
-            using (var stream = new FileStream($"C:\\Users\\Adam\\Videos\\{project.name}.wlmp", FileMode.CreateNew))
+            using (var stream = new FileStream($"C:\\Users\\Adam\\Videos\\generated\\{project.name}.wlmp", FileMode.OpenOrCreate))
             {
                 deserializer.Serialize(stream, project);
             }
@@ -44,16 +44,45 @@ namespace MovieMakerHelper
             var mediaItemCounter = 1;
             var extentCounter = 5;
             var videoClips = new List<ProjectExtentsVideoClip>();
-            var titleClips = new List<ProjectExtentsVideoClip>();
+            var imageClips = new List<ProjectExtentsImageClip>();
+            var titleClips = new List<ProjectExtentsTitleClip>();
             var videoExtentRefs = new List<ProjectExtentsExtentSelectorExtentRef>();
             var titleExtentRefs = new List<ProjectExtentsExtentSelectorExtentRef>();
             var extents = new ProjectExtents();
+            double totalLength = 0;
+            double lastTitlePosition = 0;
+
+            //add black screen to media items
+            var blackScreenMediaItem = new ProjectMediaItem
+            {
+                id = $"{mediaItemCounter}",
+                filePath = "C:\\Users\\Adam\\Videos\\Pure Black.png",
+                arWidth = "882",
+                arHeight = "446",
+                duration = "0",
+                stabilizationMode = "0",
+                mediaItemType = "2",
+                songTitle = string.Empty,
+                songAlbum = string.Empty,
+                songArtist = string.Empty,
+                songArtistUrl = string.Empty,
+                songAudioFileUrl = string.Empty,
+                songCopyrightUrl = string.Empty
+            };
+
+            mediaItems.Add(blackScreenMediaItem);
+
+            mediaItemCounter++;
 
             foreach (var dateKey in files.Keys.OrderBy(k => k))
             {
                 var filesForDate = files[dateKey].OrderBy(f => GetActualFileDateTime(f));
 
                 var isFirst = true;
+
+                double dateClipLength = 0;
+
+                var previousLength = totalLength;
 
                 foreach (var file in filesForDate)
                 {
@@ -94,15 +123,18 @@ namespace MovieMakerHelper
                         Transitions = new Transitions()
                     };
 
+                    extentCounter++;
+
                     if (isFirst)
                     {
                         //add fade in
-                        //add date heading?
+                        videoClip.Transitions = GenerateFadeThroughBlackTransition();
                         isFirst = false;
                     }
                     else
                     {
                         //add diagonal transition
+                        videoClip.Transitions = GenerateDiagonalTransition();
                     }
 
                     videoClips.Add(videoClip);
@@ -112,12 +144,67 @@ namespace MovieMakerHelper
                         id = videoClip.extentID
                     });
 
-                    extentCounter++;
+                    totalLength += (videoDetails.Duration - 1.5); //1.5 adjusts for transition
+                    dateClipLength += (videoDetails.Duration - 1.5); //1.5 adjusts for transition
+
                 }
+
+                //add date heading?
+                var titleClip = GenerateTitleClip(dateKey, extentCounter, previousLength, dateClipLength, lastTitlePosition);
+
+                if (double.Parse(titleClip.duration) >= 1) //ignore very small ones?
+                {
+                    extentCounter++;
+                    titleClips.Add(titleClip);
+                    titleExtentRefs.Add(new ProjectExtentsExtentSelectorExtentRef
+                    {
+                        id = titleClip.extentID
+                    });
+
+                    lastTitlePosition = double.Parse(titleClip.gapBefore) + double.Parse(titleClip.duration);
+                }
+
+                //add black placehold, fade out transition on last one
+                //videoClips.Last().Transitions = GenerateFadeThroughBlackTransition();
+
+                var blackImageClip = new ProjectExtentsImageClip
+                {
+                    Effects = string.Empty,
+                    extentID = $"{extentCounter}",
+                    gapBefore = "0",
+                    mediaItemID = $"{blackScreenMediaItem.id}",
+                    duration = "3",
+                    BoundProperties = new BoundProperties
+                    {
+                        BoundPropertyInt = new[] {
+                            new BoundPropertiesBoundPropertyInt
+                            {
+                                Name="rotateStepNinety",
+                                Value = "0"
+                            }
+                        }
+                    },
+                    Transitions = GenerateFadeThroughBlackTransition()
+                };
+
+                imageClips.Add(blackImageClip);
+
+                videoExtentRefs.Add(new ProjectExtentsExtentSelectorExtentRef
+                {
+                    id = blackImageClip.extentID
+                });
+
+                extentCounter++;
+
+                totalLength += 1.5;
 
             }
 
             extents.VideoClip = videoClips.ToArray();
+
+            extents.ImageClip = imageClips.ToArray();
+
+            extents.TitleClip = titleClips.ToArray();
 
             extents.ExtentSelector = new[] {
                 new ProjectExtentsExtentSelector
@@ -167,10 +254,249 @@ namespace MovieMakerHelper
             project.Extents = extents;
         }
 
+        private static ProjectExtentsTitleClip GenerateTitleClip(DateTime dateTime, int extentCounter, double totalLength, double videoDuration, double lastTitlePosition)
+        {
+            double standardDuration = 7;
+
+            var gapBefore = videoDuration > 3 ? totalLength + 3 : totalLength;
+
+            var titleDuration = (videoDuration - 1.5) < standardDuration ? videoDuration - 1.5 : standardDuration;
+
+            var titleClip = new ProjectExtentsTitleClip()
+            {
+                extentID = $"{extentCounter}",
+                gapBefore = $"{gapBefore - lastTitlePosition}",
+                duration = $"{titleDuration}"
+            };
+
+            titleClip.Transitions = string.Empty;
+
+            titleClip.BoundProperties = new BoundProperties
+            {
+                BoundPropertyFloatSet = new[]
+                {
+                    new BoundPropertiesBoundPropertyFloatSet
+                    {
+                        Name = "diffuseColor",
+                        BoundPropertyFloatElement = new []{
+                            new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                Value = "0.75"
+                            },
+                            new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                Value = "1"
+                            },
+                            new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                Value = "0"
+                            }
+                        }
+                    }
+                },
+                BoundPropertyFloat = new[]
+                {
+                    new BoundPropertiesBoundPropertyFloat
+                    {
+                        Name="transparency",
+                        Value="1"
+                    }
+                }
+            };
+
+            titleClip.Effects = new[]
+            {
+                new ProjectExtentsTitleClipTextEffect
+                {
+                    effectTemplateID = "TextEffectFadeTemplate",
+                    TextScriptId = "1",
+                    BoundProperties = new BoundProperties
+                    {
+                        BoundPropertyBool = new[]
+                        {
+                            new BoundPropertiesBoundPropertyBool
+                            {
+                                Name="automatic",
+                                Value = "false"
+                            },
+                            new BoundPropertiesBoundPropertyBool
+                            {
+                                Name="horizontal",
+                                Value = "true"
+                            },
+                            new BoundPropertiesBoundPropertyBool
+                            {
+                                Name="leftToRight",
+                                Value = "true"
+                            }
+                        },
+                        BoundPropertyFloatSet = new[]
+                        {
+                            new BoundPropertiesBoundPropertyFloatSet
+                            {
+                                Name = "color",
+                                BoundPropertyFloatElement = new []{
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "1"
+                                    },
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "1"
+                                    },
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "1"
+                                    }
+                                }
+                            },
+                            new BoundPropertiesBoundPropertyFloatSet
+                            {
+                                Name = "length"
+                            },
+                            new BoundPropertiesBoundPropertyFloatSet
+                            {
+                                Name = "outlineColor",
+                                BoundPropertyFloatElement = new []{
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "0"
+                                    },
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "0"
+                                    },
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "0"
+                                    }
+                                }
+                            },
+                            new BoundPropertiesBoundPropertyFloatSet
+                            {
+                                Name = "position",
+                                BoundPropertyFloatElement = new []{
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "3.4281764030456543"
+                                    },
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "-1.7933578491210937"
+                                    },
+                                    new BoundPropertiesBoundPropertyFloatSetBoundPropertyFloatElement{
+                                        Value = "0.02500000037252903"
+                                    }
+                                }
+                            }
+                        },
+                        BoundPropertyStringSet = new[]
+                        {
+                            new BoundPropertiesBoundPropertyStringSet
+                            {
+                                Name = "family",
+                               BoundPropertyStringElement = new[]
+                               {
+                                   new BoundPropertiesBoundPropertyStringSetBoundPropertyStringElement
+                                   {
+                                       Value = "Segoe UI"
+                                   }
+                               }
+                            },
+                            new BoundPropertiesBoundPropertyStringSet
+                            {
+                                Name = "justify",
+                               BoundPropertyStringElement = new[]
+                               {
+                                   new BoundPropertiesBoundPropertyStringSetBoundPropertyStringElement
+                                   {
+                                       Value = "END"
+                                   }
+                               }
+                            },
+                            new BoundPropertiesBoundPropertyStringSet
+                            {
+                                Name = "string",
+                               BoundPropertyStringElement = new[]
+                               {
+                                   new BoundPropertiesBoundPropertyStringSetBoundPropertyStringElement
+                                   {
+                                       Value = $"{dateTime:MM/dd/yyyy}"
+                                   }
+                               }
+                            }
+                        },
+                        BoundPropertyFloat = new[]
+                        {
+                            new BoundPropertiesBoundPropertyFloat
+                            {
+                                Name="maxExtent",
+                                Value="0"
+                            },
+                            new BoundPropertiesBoundPropertyFloat
+                            {
+                                Name="size",
+                                Value="0.40000000596046448" //TODO: understand this?
+                            },
+                            new BoundPropertiesBoundPropertyFloat
+                            {
+                                Name="transparency",
+                                Value="0"
+                            }
+                        },
+                        BoundPropertyInt = new[]
+                        {
+                            new BoundPropertiesBoundPropertyInt
+                            {
+                                Name="outlineSizeIndex",
+                                Value = "1"
+                            }
+                        },
+                        BoundPropertyString = new[]
+                        {
+                            new BoundPropertiesBoundPropertyString
+                            {
+                                Name="style",
+                                Value = "Plain"
+                            }
+                        }
+                    }
+                }
+            };
+
+            return titleClip;
+        }
+
+        private static Transitions GenerateFadeThroughBlackTransition()
+        {
+            var transition = new Transitions()
+            {
+                ShapeEffect = new[]
+                {
+                    new TransitionsShapeEffect()
+                    {
+                        BoundProperties = String.Empty,
+                        duration = "1.5",
+                        effectTemplateID = "BlurThroughBlackTransitionTemplate"
+                    }
+                }
+            };
+
+            return transition;
+        }
+
+        private static Transitions GenerateDiagonalTransition()
+        {
+            var transition = new Transitions()
+            {
+                ShaderEffect = new[]
+                {
+                    new TransitionsShaderEffect()
+                    {
+                        BoundProperties = String.Empty,
+                        duration = "1.5",
+                        effectTemplateID = "DiagonalDownRightTransitionTemplate"
+                    }
+                }
+            };
+
+            return transition;
+        }
+
         [STAThread]
         private static VideoDetails GetVideoDetails(FileInfo file)
         {
-            using(var video = new Video(file.FullName, false)){
+            using (var video = new Video(file.FullName, false))
+            {
 
                 return new VideoDetails
                 {
@@ -216,7 +542,7 @@ namespace MovieMakerHelper
         //}
 
         static readonly string[] movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf" };
-        static readonly string[] ignoreNames = { "itunes", "top gear" };
+        static readonly string[] ignoreNames = { "itunes", "top gear", "valve", "xgames", "top.gear", "pocket_lint" };
         static Dictionary<DateTime, List<FileInfo>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
         {
             var foundFiles = new Dictionary<DateTime, List<FileInfo>>();
@@ -234,7 +560,7 @@ namespace MovieMakerHelper
                     continue;
                 }
 
-                var date = GetActualFileDateTime(file);
+                var date = GetActualFileDateTime(file).Date;
 
                 if (date < minDate || date >= maxDate)
                 {
@@ -242,7 +568,7 @@ namespace MovieMakerHelper
                 }
 
                 //filter stuff we know we don't want
-                if(ignoreNames.Any(ig => file.FullName.ToLower().Contains(ig)))
+                if (ignoreNames.Any(ig => file.FullName.ToLower().Contains(ig)))
                 {
                     continue;
                 }
