@@ -203,7 +203,8 @@ namespace MovieMakerHelper
         //    return transitions;
         //}
 
-        static readonly string[] movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg" };
+        static readonly string[] movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf" };
+        static readonly string[] ignoreNames = { "itunes", "top gear" };
         static Dictionary<DateTime, List<FileInfo>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
         {
             var foundFiles = new Dictionary<DateTime, List<FileInfo>>();
@@ -224,6 +225,12 @@ namespace MovieMakerHelper
                 var date = GetActualFileDateTime(file);
 
                 if (date < minDate || date >= maxDate)
+                {
+                    continue;
+                }
+
+                //filter stuff we know we don't want
+                if(ignoreNames.Any(ig => file.FullName.ToLower().Contains(ig)))
                 {
                     continue;
                 }
