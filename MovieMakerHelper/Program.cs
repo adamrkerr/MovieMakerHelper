@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Shell32;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -9,30 +10,199 @@ using System.Xml.Serialization;
 
 namespace MovieMakerHelper
 {
+ 
     class Program
     {
+
+        [STAThread]
         static void Main(string[] args)
         {
 
             //var project = new Project() { name = "Test", themeId = "0", version = "65540", templateID = "SimpleProjectTemplate" };
+            var minDate = new DateTime(2004, 1, 1);
+            var maxDate = new DateTime(2005, 1, 1);
+            var files = CrawlFileSystem("G:\\", minDate, maxDate);
 
-            var files = CrawlFileSystem("G:\\");
+            var project = GenerateDefaultProject($"{minDate:yyyyMMdd} to {maxDate:yyyyMMdd}");
+
+            AddFilesToProject(project, files);
 
             var deserializer = new XmlSerializer(typeof(Project));
 
-            using (var stream = new FileStream("C:\\Users\\Adam\\Videos\\2017\\test.wlmp", FileMode.Open))
+            using (var stream = new FileStream($"C:\\Users\\Adam\\Videos\\{project.name}.wlmp", FileMode.CreateNew))
             {
-                var objResult = deserializer.Deserialize(stream);
-
-                var project = objResult as Project;
+                deserializer.Serialize(stream, project);
             }
         }
 
+
+        [STAThread]
+        private static void AddFilesToProject(Project project, Dictionary<DateTime, List<FileInfo>> files)
+        {
+            var mediaItems = new List<ProjectMediaItem>();
+            var mediaItemCounter = 1;
+            var extentCounter = 1;
+            var videoClips = new List<ProjectExtentsVideoClip>();
+            var titleClips = new List<ProjectExtentsVideoClip>();
+            var videoExtentRefs = new List<ProjectExtentsExtentSelectorExtentRef>();
+            var titleExtentRefs = new List<ProjectExtentsExtentSelectorExtentRef>();
+            var extents = new ProjectExtents();
+
+            foreach (var dateKey in files.Keys.OrderBy(k => k))
+            {
+                var filesForDate = files[dateKey].OrderBy(f => GetActualFileDateTime(f));
+
+
+                foreach (var file in filesForDate)
+                {
+                    var mediaItem = new ProjectMediaItem
+                    {
+                        id = $"{mediaItemCounter}",
+                        filePath = file.FullName,
+                        arWidth = "1920", //TODO
+                        arHeight = "1080", //TODO
+                        duration = GetVideoDuration(file).ToString(), //TODO
+                        stabilizationMode = "0",
+                        mediaItemType = "1",
+                        songTitle = string.Empty,
+                        songAlbum = string.Empty,
+                        songArtist = string.Empty,
+                        songArtistUrl = string.Empty,
+                        songAudioFileUrl = string.Empty,
+                        songCopyrightUrl = string.Empty
+                    };
+
+                    mediaItems.Add(mediaItem);
+
+                    mediaItemCounter++;
+
+                    var videoClip = new ProjectExtentsVideoClip
+                    {
+                        extentID = $"{extentCounter}",
+                        gapBefore = "0",
+                        mediaItemID = mediaItem.id,
+                        inTime = "0",
+                        outTime = "0",
+                        speed = "1",
+                        stabilizationMode = "0",
+                        BoundProperties = GenerateDefaultVideoBoundProperties(),
+                        Effects = string.Empty,
+                        Transitions = new Transitions()
+                    };
+
+                    videoClips.Add(videoClip);
+
+                    videoExtentRefs.Add(new ProjectExtentsExtentSelectorExtentRef
+                    {
+                        id = videoClip.extentID
+                    });
+
+                    extentCounter++;
+                }
+
+            }
+
+            extents.VideoClip = videoClips.ToArray();
+
+            extents.ExtentSelector = new[] {
+                new ProjectExtentsExtentSelector
+                {
+                    extentID = "1",
+                    gapBefore = "0",
+                    primaryTrack = "true",
+                    Effects = String.Empty,
+                    BoundProperties = string.Empty,
+                    Transitions = string.Empty,
+                    ExtentRefs = videoExtentRefs.ToArray()
+                },
+                new ProjectExtentsExtentSelector
+                {
+                    extentID = "2",
+                    gapBefore = "0",
+                    primaryTrack = "false",
+                    Effects = String.Empty,
+                    BoundProperties = string.Empty,
+                    Transitions = string.Empty,
+                    ExtentRefs = new ProjectExtentsExtentSelectorExtentRef[0]
+                },
+                new ProjectExtentsExtentSelector
+                {
+                    extentID = "3",
+                    gapBefore = "0",
+                    primaryTrack = "false",
+                    Effects = String.Empty,
+                    BoundProperties = string.Empty,
+                    Transitions = string.Empty,
+                    ExtentRefs = new ProjectExtentsExtentSelectorExtentRef[0]
+                },
+                new ProjectExtentsExtentSelector
+                {
+                    extentID = "4",
+                    gapBefore = "0",
+                    primaryTrack = "false",
+                    Effects = String.Empty,
+                    BoundProperties = string.Empty,
+                    Transitions = string.Empty,
+                    ExtentRefs = titleExtentRefs.ToArray()
+                }
+            };
+
+            project.MediaItems = mediaItems.ToArray();
+
+            project.Extents = extents;
+        }
+
+        [STAThread]
+        private static double GetVideoDuration(FileInfo fileInfo)
+        {
+            IShellDispatch6 shl = new Shell();
+            var fldr = shl.NameSpace(fileInfo.DirectoryName);
+            var itm = fldr.ParseName(fileInfo.Name);
+
+            var propValue = fldr.GetDetailsOf(itm, 27);
+
+            return TimeSpan.Parse(propValue).TotalSeconds;
+        }
+
+        private static BoundProperties GenerateDefaultVideoBoundProperties()
+        {
+            var boundProperties = new BoundProperties
+            {
+                BoundPropertyBool = new[] { new BoundPropertiesBoundPropertyBool {
+                Name = "Mute",
+                Value = "false"
+                }
+                },
+                BoundPropertyInt = new[] { new BoundPropertiesBoundPropertyInt {
+                    Name="rotateStepNinety",
+                    Value = "0"
+                } },
+                BoundPropertyFloat = new[] { new BoundPropertiesBoundPropertyFloat
+                {
+                    Name = "Volume",
+                    Value = "1"
+                }
+                }
+            };
+
+            return boundProperties;
+        }
+
+        //private static Transitions GenerateFadeBlackTransition()
+        //{
+        //    var transitions = new Transitions()
+        //    {
+        //        ShaderEffect = new[] { }
+        //    };
+
+        //    return transitions;
+        //}
+
         static readonly string[] movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg" };
-        static Dictionary<DateTime, List<FileInfo>> CrawlFileSystem(string startPath)
+        static Dictionary<DateTime, List<FileInfo>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
         {
             var foundFiles = new Dictionary<DateTime, List<FileInfo>>();
-                        
+
             var directory = new DirectoryInfo(startPath);
 
             var files = directory.GetFiles();
@@ -40,53 +210,47 @@ namespace MovieMakerHelper
             foreach (var file in files)
             {
                 var fileExtension = Path.GetExtension(file.Name).ToLower();
-                if (movieExtensions.Contains(fileExtension))
+
+                if (!movieExtensions.Contains(fileExtension))
                 {
-                    var date = file.LastWriteTime <= file.CreationTime ? file.LastWriteTime : file.CreationTime;
-
-                    var name = file.Name.Remove(file.Name.Length - fileExtension.Length);
-
-                    if (name.Length >= 8)
-                    {
-                        if (DateTime.TryParseExact(name.Substring(0, 8), "yyyyMMdd", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
-                        {
-                            if (date > parsedDate)
-                            {
-                                date = parsedDate;
-                            }
-                        }
-                    }
-
-                    date = date.Date;
-
-                    if (!foundFiles.ContainsKey(date))
-                    {
-                        foundFiles.Add(date, new List<FileInfo>());
-                    }
-
-                    foundFiles[date].Add(file);
+                    continue;
                 }
+
+                var date = GetActualFileDateTime(file);
+
+                if (date < minDate || date >= maxDate)
+                {
+                    continue;
+                }
+
+                if (!foundFiles.ContainsKey(date))
+                {
+                    foundFiles.Add(date, new List<FileInfo>());
+                }
+
+                foundFiles[date].Add(file);
             }
 
             var directories = directory.GetDirectories();
 
-            foreach(var childDirectory in directories)
+            foreach (var childDirectory in directories)
             {
 
                 if (childDirectory.Attributes.HasFlag(FileAttributes.Hidden))
                     continue;
 
-                var childFiles = CrawlFileSystem(childDirectory.FullName);
+                var childFiles = CrawlFileSystem(childDirectory.FullName, minDate, maxDate);
 
-                foreach(var date in childFiles.Keys)
+                foreach (var date in childFiles.Keys)
                 {
                     if (!foundFiles.ContainsKey(date))
                     {
                         foundFiles.Add(date, new List<FileInfo>());
                     }
 
-                    foreach(var newFile in childFiles[date])
+                    foreach (var newFile in childFiles[date])
                     {
+                        //unlikely that two files with same name and same exact file size would not be the duplicates
                         var existing = foundFiles[date].FirstOrDefault(f => f.Name == newFile.Name && f.Length == newFile.Length);
                         if (existing == null)
                         {
@@ -102,6 +266,29 @@ namespace MovieMakerHelper
             }
 
             return foundFiles;
+        }
+
+        static DateTime GetActualFileDateTime(FileInfo file)
+        {
+            var fileExtension = Path.GetExtension(file.Name);
+
+            var date = file.LastWriteTime <= file.CreationTime ? file.LastWriteTime : file.CreationTime;
+
+            var name = file.Name.Remove(file.Name.Length - fileExtension.Length);
+
+            if (name.Length >= 14)
+            {
+                if (DateTime.TryParseExact(name.Substring(0, 8), "yyyyMMdd_HHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate)
+                    || DateTime.TryParseExact(name.Substring(0, 8), "yyyyMMddHHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedDate))
+                {
+                    if (date > parsedDate)
+                    {
+                        date = parsedDate;
+                    }
+                }
+            }
+
+            return date;
         }
 
         static Project GenerateDefaultProject(string projectName)
@@ -148,7 +335,7 @@ namespace MovieMakerHelper
 
             project.ThemeOperationLog = new ProjectThemeOperationLog
             {
-                MonolithicThemeOperations = null,
+                MonolithicThemeOperations = string.Empty,
                 themeID = "0"
             };
 
