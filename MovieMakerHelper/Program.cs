@@ -161,7 +161,7 @@ namespace MovieMakerHelper
                         id = titleClip.extentID
                     });
 
-                    lastTitlePosition = double.Parse(titleClip.gapBefore) + double.Parse(titleClip.duration);
+                    lastTitlePosition += double.Parse(titleClip.gapBefore) + double.Parse(titleClip.duration);
                 }
 
                 //add black placehold, fade out transition on last one
@@ -196,7 +196,7 @@ namespace MovieMakerHelper
 
                 extentCounter++;
 
-                totalLength += 1.5;
+                totalLength += 3;
 
             }
 
@@ -258,14 +258,14 @@ namespace MovieMakerHelper
         {
             double standardDuration = 7;
 
-            var gapBefore = videoDuration > 3 ? totalLength + 3 : totalLength;
+            var gapBefore = (totalLength - lastTitlePosition) + 3;
 
             var titleDuration = (videoDuration - 1.5) < standardDuration ? videoDuration - 1.5 : standardDuration;
 
             var titleClip = new ProjectExtentsTitleClip()
             {
                 extentID = $"{extentCounter}",
-                gapBefore = $"{gapBefore - lastTitlePosition}",
+                gapBefore = $"{gapBefore}",
                 duration = $"{titleDuration}"
             };
 
