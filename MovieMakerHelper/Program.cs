@@ -14,25 +14,37 @@ namespace MovieMakerHelper
 
     class Program
     {
+        private static DateTime _startDate = new DateTime(2009, 1, 1);
+        private static DateTime _endDate = new DateTime(2010, 1, 1);
+        private const string _searchDirectory = "G:\\";
+        private const string _outputDirectoryFormat = "C:\\Users\\Adam\\Videos\\generated\\{0}.wlmp";
+        private const string _dividerPath = "C:\\Users\\Adam\\Videos\\Pure Black.png";
+        static readonly string[] _movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf" };
+        static readonly string[] _ignoreNames = { "itunes", "top gear", "valve", "xgames", "top.gear", "pocket_lint", "fireproof", "\\videos\\", "\\local disk (g)\\movies\\", "\\my movies\\", "\\my documents\\my videos\\" };
 
         [STAThread]
         static void Main(string[] args)
         {
+            var currentStartTime = _startDate;
+            var currentEndTime = _startDate.AddYears(1);
 
-            //var project = new Project() { name = "Test", themeId = "0", version = "65540", templateID = "SimpleProjectTemplate" };
-            var minDate = new DateTime(2005, 1, 1);
-            var maxDate = new DateTime(2006, 1, 1);
-            var files = CrawlFileSystem("G:\\", minDate, maxDate);
-
-            var project = GenerateDefaultProject($"{minDate:yyyyMMdd} to {maxDate:yyyyMMdd}");
-
-            AddFilesToProject(project, files);
-
-            var deserializer = new XmlSerializer(typeof(Project));
-
-            using (var stream = new FileStream($"C:\\Users\\Adam\\Videos\\generated\\{project.name}.wlmp", FileMode.OpenOrCreate))
+            while (currentEndTime <= _endDate)
             {
-                deserializer.Serialize(stream, project);
+                var files = CrawlFileSystem(_searchDirectory, currentStartTime, currentEndTime);
+
+                var project = GenerateDefaultProject($"{currentStartTime:yyyyMMdd} to {currentEndTime:yyyyMMdd}");
+
+                AddFilesToProject(project, files);
+
+                var deserializer = new XmlSerializer(typeof(Project));
+
+                using (var stream = new FileStream(string.Format(_outputDirectoryFormat, project.name), FileMode.OpenOrCreate))
+                {
+                    deserializer.Serialize(stream, project);
+                }
+
+                currentStartTime = currentEndTime;
+                currentEndTime = currentEndTime.AddYears(1);
             }
         }
 
@@ -52,23 +64,7 @@ namespace MovieMakerHelper
             double totalLength = 0;
             double lastTitlePosition = 0;
 
-            //add black screen to media items
-            var blackScreenMediaItem = new ProjectMediaItem
-            {
-                id = $"{mediaItemCounter}",
-                filePath = "C:\\Users\\Adam\\Videos\\Pure Black.png",
-                arWidth = "882",
-                arHeight = "446",
-                duration = "0",
-                stabilizationMode = "0",
-                mediaItemType = "2",
-                songTitle = string.Empty,
-                songAlbum = string.Empty,
-                songArtist = string.Empty,
-                songArtistUrl = string.Empty,
-                songAudioFileUrl = string.Empty,
-                songCopyrightUrl = string.Empty
-            };
+            var blackScreenMediaItem = GenerateDividerItem(mediaItemCounter);
 
             mediaItems.Add(blackScreenMediaItem);
 
@@ -254,13 +250,44 @@ namespace MovieMakerHelper
             project.Extents = extents;
         }
 
+        private static ProjectMediaItem GenerateDividerItem(int mediaItemCounter)
+        {
+            //add black screen to media items
+            return new ProjectMediaItem
+            {
+                id = $"{mediaItemCounter}",
+                filePath = _dividerPath,
+                arWidth = "882",
+                arHeight = "446",
+                duration = "0",
+                stabilizationMode = "0",
+                mediaItemType = "2",
+                songTitle = string.Empty,
+                songAlbum = string.Empty,
+                songArtist = string.Empty,
+                songArtistUrl = string.Empty,
+                songAudioFileUrl = string.Empty,
+                songCopyrightUrl = string.Empty
+            };
+        }
+
         private static ProjectExtentsTitleClip GenerateTitleClip(DateTime dateTime, int extentCounter, double totalLength, double videoDuration, double lastTitlePosition)
         {
             double standardDuration = 7;
 
             var gapBefore = (totalLength - lastTitlePosition) + 3;
 
-            var titleDuration = (videoDuration - 1.5) < standardDuration ? videoDuration - 1.5 : standardDuration;
+            var titleDuration = 0.0;
+
+            if (videoDuration < standardDuration)
+            {
+                titleDuration = videoDuration;
+                gapBefore -= 3; //remove lead time
+            }
+            else
+            {
+                titleDuration = standardDuration;
+            }
 
             var titleClip = new ProjectExtentsTitleClip()
             {
@@ -497,12 +524,11 @@ namespace MovieMakerHelper
         {
             using (var video = new Video(file.FullName, false))
             {
-
                 return new VideoDetails
                 {
                     Duration = video.Duration,
-                    Height = video.Size.Height,
-                    Width = video.Size.Width
+                    Height = video.DefaultSize.Height,
+                    Width = video.DefaultSize.Width
                 };
             }
         }
@@ -530,19 +556,7 @@ namespace MovieMakerHelper
 
             return boundProperties;
         }
-
-        //private static Transitions GenerateFadeBlackTransition()
-        //{
-        //    var transitions = new Transitions()
-        //    {
-        //        ShaderEffect = new[] { }
-        //    };
-
-        //    return transitions;
-        //}
-
-        static readonly string[] movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf" };
-        static readonly string[] ignoreNames = { "itunes", "top gear", "valve", "xgames", "top.gear", "pocket_lint" };
+                
         static Dictionary<DateTime, List<FileInfo>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
         {
             var foundFiles = new Dictionary<DateTime, List<FileInfo>>();
@@ -555,7 +569,13 @@ namespace MovieMakerHelper
             {
                 var fileExtension = Path.GetExtension(file.Name).ToLower();
 
-                if (!movieExtensions.Contains(fileExtension))
+                if (!_movieExtensions.Contains(fileExtension))
+                {
+                    continue;
+                }
+
+                //filter stuff we know we don't want
+                if (_ignoreNames.Any(ig => file.FullName.ToLower().Contains(ig)))
                 {
                     continue;
                 }
@@ -566,13 +586,7 @@ namespace MovieMakerHelper
                 {
                     continue;
                 }
-
-                //filter stuff we know we don't want
-                if (ignoreNames.Any(ig => file.FullName.ToLower().Contains(ig)))
-                {
-                    continue;
-                }
-
+                
                 if (!foundFiles.ContainsKey(date))
                 {
                     foundFiles.Add(date, new List<FileInfo>());
@@ -626,12 +640,21 @@ namespace MovieMakerHelper
 
             var name = file.Name.Remove(file.Name.Length - fileExtension.Length);
 
-            if (name.Length >= 14)
+            if (name.Length >= 15)
             {
-                if (DateTime.TryParseExact(name.Substring(0, 8), "yyyyMMdd_HHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate)
-                    || DateTime.TryParseExact(name.Substring(0, 8), "yyyyMMddHHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out parsedDate))
+                if (DateTime.TryParseExact(name.Substring(0, 15), "yyyyMMdd_HHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
                 {
-                    if (date > parsedDate)
+                    if (date != parsedDate)
+                    {
+                        date = parsedDate;
+                    }
+                }
+            }
+            else if (name.Length == 14)
+            {
+                if (DateTime.TryParseExact(name.Substring(0, 14), "yyyyMMddHHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
+                {
+                    if (date != parsedDate)
                     {
                         date = parsedDate;
                     }
