@@ -14,19 +14,21 @@ namespace MovieMakerHelper
 
     class Program
     {
-        private static DateTime _startDate = new DateTime(2009, 1, 1);
-        private static DateTime _endDate = new DateTime(2010, 1, 1);
+        private static DateTime _startDate = new DateTime(2005, 1, 1);
+        private static DateTime _endDate = new DateTime(2014, 1, 1);
         private const string _searchDirectory = "G:\\";
         private const string _outputDirectoryFormat = "C:\\Users\\Adam\\Videos\\generated\\{0}.wlmp";
         private const string _dividerPath = "C:\\Users\\Adam\\Videos\\Pure Black.png";
-        static readonly string[] _movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf" };
-        static readonly string[] _ignoreNames = { "itunes", "top gear", "valve", "xgames", "top.gear", "pocket_lint", "fireproof", "\\videos\\", "\\local disk (g)\\movies\\", "\\my movies\\", "\\my documents\\my videos\\" };
+        static readonly string[] _movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf", ".3gp" };
+        static readonly string[] _ignoreNames = { "itunes", "top gear", "valve", "xgames", "top.gear", "pocket_lint", "fireproof",
+            "\\zip disks\\", "\\videos\\", "\\local disk (g)\\movies\\", "\\my movies\\", "\\my documents\\my videos\\", "gopr", "g0pr" };
 
         [STAThread]
         static void Main(string[] args)
         {
             var currentStartTime = _startDate;
             var currentEndTime = _startDate.AddYears(1);
+            //var currentEndTime = _endDate;
 
             while (currentEndTime <= _endDate)
             {
@@ -559,10 +561,19 @@ namespace MovieMakerHelper
                 
         static Dictionary<DateTime, List<FileInfo>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
         {
+
             var foundFiles = new Dictionary<DateTime, List<FileInfo>>();
 
-            var directory = new DirectoryInfo(startPath);
+            //ignore whole directories
+            if(_ignoreNames.Any(ig => startPath.ToLower().Contains(ig)))
+            {
+                return foundFiles;
+            }
 
+            Console.WriteLine($"{minDate:MM/dd/yyyy} {maxDate:MM/dd/yyy} Directory: {startPath}");
+
+            var directory = new DirectoryInfo(startPath);
+            
             var files = directory.GetFiles();
 
             foreach (var file in files)
