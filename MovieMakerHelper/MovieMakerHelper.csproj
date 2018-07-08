@@ -74,5 +74,11 @@
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </COMReference>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FileSystemCrawler\FileSystemCrawler.csproj">
+      <Project>{8C5568FF-EDD2-41DD-AF40-2AE9222F0C6D}</Project>
+      <Name>FileSystemCrawler</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
