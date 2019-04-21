@@ -17,11 +17,10 @@ namespace FileSystemCrawler
         public List<string> IgnoredNames { get; set; }
 
         public List<string> IncludedExtensions { get; set; }
-
-        public Dictionary<DateTime, List<FileInfo>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
+        
+        public Dictionary<DateTime, List<VideoDetails>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
         {
-
-            var foundFiles = new Dictionary<DateTime, List<FileInfo>>();
+            var foundFiles = new Dictionary<DateTime, List<VideoDetails>>();
 
             //ignore whole directories
             if (IgnoredNames.Any(ig => startPath.ToLower().Contains(ig)))
@@ -50,7 +49,7 @@ namespace FileSystemCrawler
                     continue;
                 }
 
-                var date = GetActualFileDateTime(file).Date;
+                var date = VideoDetails.GetActualFileDateTime(file).Date;
 
                 if (date < minDate || date >= maxDate)
                 {
@@ -59,10 +58,10 @@ namespace FileSystemCrawler
 
                 if (!foundFiles.ContainsKey(date))
                 {
-                    foundFiles.Add(date, new List<FileInfo>());
+                    foundFiles.Add(date, new List<VideoDetails>());
                 }
 
-                foundFiles[date].Add(file);
+                foundFiles[date].Add(new VideoDetails(file));
             }
 
             var directories = directory.GetDirectories();
@@ -81,76 +80,8 @@ namespace FileSystemCrawler
             return foundFiles;
         }
 
-        protected abstract void ProcessChildFiles(Dictionary<DateTime, List<FileInfo>> foundFiles, Dictionary<DateTime, List<FileInfo>> childFiles);
+        protected abstract void ProcessChildFiles(Dictionary<DateTime, List<VideoDetails>> foundFiles, Dictionary<DateTime, List<VideoDetails>> childFiles);
 
-        public static DateTime GetActualFileDateTime(FileInfo file)
-        {
-            var fileExtension = Path.GetExtension(file.Name);
-
-            var date = file.LastWriteTime <= file.CreationTime ? file.LastWriteTime : file.CreationTime;
-
-            var name = file.Name.Remove(file.Name.Length - fileExtension.Length);
-
-            if (name.Length >= 15)
-            {
-                if (DateTime.TryParseExact(name.Substring(0, 15), "yyyyMMdd_HHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    if (date != parsedDate)
-                    {
-                        date = parsedDate;
-                    }
-                }
-            }
-            else if (name.Length == 14)
-            {
-                if (DateTime.TryParseExact(name.Substring(0, 14), "yyyyMMddHHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    if (date != parsedDate)
-                    {
-                        date = parsedDate;
-                    }
-                }
-            }
-
-            return date;
-        }
     }
 
-    public class UniqueFileCrawler : CrawlerBase
-    {
-        public UniqueFileCrawler(IEnumerable<string> namesToIgnore, IEnumerable<string> extensionsToSearch) :base(namesToIgnore, extensionsToSearch) { }
-
-        /// <summary>
-        /// In this implementation, we filter out files that are duplicates.
-        /// Duplicate files are detected based on name and size, 
-        /// it seems unlikely that two files with same name and same exact file size would not be the duplicates
-        /// </summary>
-        /// <param name="foundFiles"></param>
-        /// <param name="childFiles"></param>
-        protected override void ProcessChildFiles(Dictionary<DateTime, List<FileInfo>> foundFiles, Dictionary<DateTime, List<FileInfo>> childFiles)
-        {
-            foreach (var date in childFiles.Keys)
-            {
-                if (!foundFiles.ContainsKey(date))
-                {
-                    foundFiles.Add(date, new List<FileInfo>());
-                }
-
-                foreach (var newFile in childFiles[date])
-                {
-                    //unlikely that two files with same name and same exact file size would not be the duplicates
-                    var existing = foundFiles[date].FirstOrDefault(f => f.Name == newFile.Name && f.Length == newFile.Length);
-                    if (existing == null)
-                    {
-                        foundFiles[date].Add(newFile);
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Found possible duplicate file: {existing.FullName} -- {newFile.FullName}");
-                    }
-                }
-
-            }
-        }
-    }
 }

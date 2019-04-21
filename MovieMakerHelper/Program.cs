@@ -15,20 +15,22 @@ namespace MovieMakerHelper
 
     class Program
     {
-        private static DateTime _startDate = new DateTime(2005, 1, 1);
-        private static DateTime _endDate = new DateTime(2014, 1, 1);
-        private const string _searchDirectory = "G:\\";
+        private static DateTime _startDate = new DateTime(2017, 11, 1);
+        private static DateTime _endDate = new DateTime(2018, 2, 1);
+        private const string _searchDirectory = "F:\\";
         private const string _outputDirectoryFormat = "C:\\Users\\Adam\\Videos\\generated\\{0}.wlmp";
         private const string _dividerPath = "C:\\Users\\Adam\\Videos\\Pure Black.png";
         static readonly string[] _movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf", ".3gp" };
         static readonly string[] _ignoreNames = { "itunes", "top gear", "valve", "xgames", "top.gear", "pocket_lint", "fireproof",
-            "\\zip disks\\", "\\videos\\", "\\local disk (g)\\movies\\", "\\my movies\\", "\\my documents\\my videos\\", "gopr", "g0pr" };
+            "\\zip disks\\", "\\videos\\", "\\local disk (g)\\movies\\", "\\my movies\\", "\\my documents\\my videos\\", "gopr", "g0pr",
+            "video0054.mp4", "video0056.mp4", "video0058.mp4", "video0061.mp4", "video0062.mp4", "video0063.mp4", "video0068.mp4",
+            "video0072.mp4", "video0070.mp4", "video0071.mp4" };
 
         [STAThread]
         static void Main(string[] args)
         {
             var currentStartTime = _startDate;
-            var currentEndTime = _startDate.AddYears(1);
+            var currentEndTime = _startDate.AddMonths(1);
             //var currentEndTime = _endDate;
 
             var uniqueFileCrawler = new UniqueFileCrawler(_ignoreNames, _movieExtensions);
@@ -49,13 +51,13 @@ namespace MovieMakerHelper
                 }
 
                 currentStartTime = currentEndTime;
-                currentEndTime = currentEndTime.AddYears(1);
+                currentEndTime = currentEndTime.AddMonths(1);
             }
         }
 
 
         [STAThread]
-        private static void AddFilesToProject(Project project, Dictionary<DateTime, List<FileInfo>> files)
+        private static void AddFilesToProject(Project project, Dictionary<DateTime, List<VideoDetails>> files)
         {
             var mediaItems = new List<ProjectMediaItem>();
             var mediaItemCounter = 1;
@@ -77,7 +79,7 @@ namespace MovieMakerHelper
 
             foreach (var dateKey in files.Keys.OrderBy(k => k))
             {
-                var filesForDate = files[dateKey].OrderBy(f => CrawlerBase.GetActualFileDateTime(f));
+                var filesForDate = files[dateKey].OrderBy(f => f.ActualFileDateTime);
 
                 var isFirst = true;
 
@@ -92,7 +94,7 @@ namespace MovieMakerHelper
                     var mediaItem = new ProjectMediaItem
                     {
                         id = $"{mediaItemCounter}",
-                        filePath = file.FullName,
+                        filePath = file.FileInfo.FullName,
                         arWidth = videoDetails.Width.ToString(), //TODO
                         arHeight = videoDetails.Height.ToString(), //TODO
                         duration = videoDetails.Duration.ToString(), //TODO
@@ -525,17 +527,15 @@ namespace MovieMakerHelper
         }
 
         [STAThread]
-        private static VideoDetails GetVideoDetails(FileInfo file)
+        private static VideoDetails GetVideoDetails(VideoDetails file)
         {
-            using (var video = new Video(file.FullName, false))
+            using (var video = new Video(file.FileInfo.FullName, false))
             {
-                return new VideoDetails
-                {
-                    Duration = video.Duration,
-                    Height = video.DefaultSize.Height,
-                    Width = video.DefaultSize.Width
-                };
+                file.Duration = video.Duration;
+                file.Height = video.DefaultSize.Height;
+                file.Width = video.DefaultSize.Width;
             }
+            return file;
         }
 
         private static BoundProperties GenerateDefaultVideoBoundProperties()
@@ -643,10 +643,4 @@ namespace MovieMakerHelper
         }
     }
 
-    class VideoDetails
-    {
-        public double Duration { get; set; }
-        public int Height { get; set; }
-        public int Width { get; set; }
-    }
 }
