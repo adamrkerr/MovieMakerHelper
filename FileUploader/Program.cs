@@ -1,4 +1,9 @@
-﻿using FileSystemCrawler;
+﻿using Amazon;
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
+using Amazon.S3.Transfer;
+using FileSystemCrawler;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -23,7 +28,7 @@ namespace FileUploader
 
                 Task.WaitAll(uploader, waiter);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine(ex.Message);
                 Console.WriteLine(ex.StackTrace);
@@ -36,29 +41,142 @@ namespace FileUploader
 
         static async Task UploadFiles()
         {
-            //create the filestream to record the uploads
-            _progressStream = new StreamWriter(Path.Combine(_uploaderConfiguration.UploadRecordPath, $"Uploads_{DateTime.Now:yyyyMMddhhmmss}.csv"));
-
             var filesToUpload = await LoadVideoDetails();
-
-            //TODO: filter the files by date?
+            
+            filesToUpload = filesToUpload.Where(f => f.ActualFileDateTime >= _uploaderConfiguration.OldestFileDate
+                                                && f.ActualFileDateTime < _uploaderConfiguration.NewestFileDate)
+                                                .ToList();
 
             Console.WriteLine($"Loaded {filesToUpload.Count} records for upload");
 
             //put in a queue to make this easy
             var fileQueue = new Queue<VideoDetails>(filesToUpload);
 
-            while (!_stopFlag && fileQueue.Any())
+            //create the filestream to record the uploads
+            using (_progressStream = new StreamWriter(Path.Combine(_uploaderConfiguration.UploadRecordPath, $"Uploads_{DateTime.Now:yyyyMMddhhmmss}.csv")))
+            using (var awsClient = new AmazonS3Client(GetConfig()))
             {
-                var detail = fileQueue.Dequeue();
-                Console.WriteLine($"Uploading file {detail.FileInfo.FullName}");
-                await _progressStream.WriteLineAsync($"\"{detail.ActualFileDateTime}\",\"{detail.FileInfo.FullName}\"");
-                await _progressStream.FlushAsync();
-                await Task.Delay(5000);
+                await _progressStream.WriteLineAsync("Date,Path,Success");
+                while (!_stopFlag && fileQueue.Any())
+                {
+                    var detail = fileQueue.Dequeue();
+                                        
+                    await UploadFile(awsClient, detail);
+                }
             }
 
+            _progressStream = null;
             Console.WriteLine("Completed uploading, press any key to exit.");
             Console.ReadLine();
+        }
+
+        static AmazonS3Config GetConfig()
+        {
+            return new AmazonS3Config
+            {
+                RegionEndpoint = RegionEndpoint.GetBySystemName(_uploaderConfiguration.RegionName)                
+            };
+        }
+
+        static async Task UploadFile(AmazonS3Client s3Client, VideoDetails detail)
+        {
+            Console.WriteLine($"Uploading file {detail.FileInfo.FullName}");
+
+            try
+            {
+                if (!File.Exists(detail.FileInfo.FullName))
+                {
+                    Console.WriteLine($"File {detail.FileInfo.FullName} was not found!");
+                    throw new FileNotFoundException($"File {detail.FileInfo.FullName} was not found!");
+                }
+
+                var bucketName = $"{_uploaderConfiguration.ArchiveBucketRoot}/{detail.ActualFileDateTime.Year}/{detail.ActualFileDateTime.Month}";
+                var fileKey = detail.FileInfo.Name;
+
+                //check for existing file with same name
+                fileKey = await GetUniqueFileKey(s3Client, detail, bucketName, fileKey);
+
+                var transferRequest = new TransferUtilityUploadRequest
+                {
+                    BucketName = bucketName,
+                    FilePath = detail.FileInfo.FullName,
+                    StorageClass = _uploaderConfiguration.ArchiveStorageClass,
+                    CannedACL = S3CannedACL.Private,
+                    Key = fileKey
+                };
+
+                transferRequest.UploadProgressEvent += new EventHandler<UploadProgressArgs>(WriteProgess);
+                transferRequest.TagSet = new List<Tag>
+                {
+                    new Tag(){Key = nameof(VideoDetails.ActualFileDateTime), Value = detail.ActualFileDateTime.ToString()},
+                    new Tag(){Key = "Year", Value = detail.ActualFileDateTime.Year.ToString()},
+                    new Tag(){Key = "Month", Value = detail.ActualFileDateTime.Month.ToString()},
+                    new Tag(){Key = "Day", Value = detail.ActualFileDateTime.Day.ToString()},
+                    new Tag(){Key = nameof(VideoDetails.Duration), Value = detail.Duration.ToString()},
+                    new Tag(){Key = nameof(VideoDetails.Height), Value = detail.Height.ToString()},
+                    new Tag(){Key = nameof(VideoDetails.Width), Value = detail.Width.ToString()},
+                    new Tag(){Key = "OriginalPath", Value = detail.FileInfo.FullName.Replace('\\', '/')},
+                    new Tag(){Key = "Extension", Value = detail.FileInfo.Extension},
+                    new Tag(){Key = "UploadedDate", Value = DateTime.Now.ToString()}
+                };
+
+                var utility = new TransferUtility(s3Client);
+
+                await utility.UploadAsync(transferRequest);                                
+            }
+            catch (Exception ex)
+            {
+                await _progressStream.WriteLineAsync($"\"{detail.ActualFileDateTime}\",\"{detail.FileInfo.FullName}\",false,\"{ex.Message}\"");
+                
+                await _progressStream.FlushAsync();
+
+                return;
+            }
+
+            await _progressStream.WriteLineAsync($"\"{detail.ActualFileDateTime}\",\"{detail.FileInfo.FullName}\",true");
+
+            await _progressStream.FlushAsync();
+        }
+
+        private static async Task<string> GetUniqueFileKey(AmazonS3Client s3Client, VideoDetails detail, string bucketName, string fileKey, int increment = 1)
+        {
+            var existingObjectRequest = new GetObjectMetadataRequest
+            {
+                BucketName = bucketName,
+                Key = fileKey                
+            };
+
+            try
+            {
+
+                var existingResponse = await s3Client.GetObjectMetadataAsync(existingObjectRequest);
+
+                if (existingResponse.HttpStatusCode != System.Net.HttpStatusCode.NotFound)
+                {
+                    fileKey = (detail.FileInfo.Name.Replace(detail.FileInfo.Extension, string.Empty)) + $"_{increment}" + detail.FileInfo.Extension;
+
+                    //check if the next increment exists
+                    return await GetUniqueFileKey(s3Client, detail, bucketName, fileKey, increment++);
+                }
+            }
+            catch(AmazonS3Exception ex)
+            {
+                if(ex.ErrorCode == "NotFound")
+                {
+                    return fileKey;
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return fileKey;
+        }
+
+        private static void WriteProgess(object sender, UploadProgressArgs e)
+        {
+            Console.WriteLine($"Uploaded {e.TransferredBytes} / {e.TotalBytes}, {e.PercentDone}%");
         }
 
         static async Task WaitForInput()
@@ -71,7 +189,7 @@ namespace FileUploader
         {
             var details = new List<VideoDetails>();
 
-            using(var reader = new StreamReader(_uploaderConfiguration.FileCatalogPath))
+            using (var reader = new StreamReader(_uploaderConfiguration.FileCatalogPath))
             {
                 //skip title line
                 await reader.ReadLineAsync();
