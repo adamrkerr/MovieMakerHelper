@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileCataloger", "FileCatalo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileUploader", "FileUploader\FileUploader.csproj", "{AAE218BE-FB5C-4270-BCD5-EAE044740F0A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TranscoderEnqueuer", "TranscoderEnqueuer\TranscoderEnqueuer.csproj", "{F2F92E81-5C26-4FB4-9D88-FF8BB1076F0B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{AAE218BE-FB5C-4270-BCD5-EAE044740F0A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AAE218BE-FB5C-4270-BCD5-EAE044740F0A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AAE218BE-FB5C-4270-BCD5-EAE044740F0A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F2F92E81-5C26-4FB4-9D88-FF8BB1076F0B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2F92E81-5C26-4FB4-9D88-FF8BB1076F0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2F92E81-5C26-4FB4-9D88-FF8BB1076F0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2F92E81-5C26-4FB4-9D88-FF8BB1076F0B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

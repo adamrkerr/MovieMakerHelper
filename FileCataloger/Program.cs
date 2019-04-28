@@ -11,7 +11,7 @@ namespace FileCataloger
 {
     class Program
     {
-        private static DateTime _startDate = new DateTime(2005, 1, 1);
+        private static DateTime _startDate = new DateTime(2016, 1, 1);
         private static DateTime _endDate = new DateTime(2019, 1, 1);
         private const string _searchDirectory = "F:\\";
         private const string _outputDirectoryFormat = "C:\\Users\\Adam\\Videos\\Reports\\{0}.csv";
@@ -29,7 +29,7 @@ namespace FileCataloger
             var files = uniqueFileCrawler.CrawlFileSystem(_searchDirectory, _startDate, _endDate);
 
             var reportString = GenerateFileReport(files);
-            var reportFileName = string.Format(_outputDirectoryFormat, $"{_endDate:yyyyMMdd} to {_startDate:yyyyMMdd}");
+            var reportFileName = string.Format(_outputDirectoryFormat, $"{_startDate:yyyyMMdd} to {_endDate:yyyyMMdd}");
             using(var writer = new StreamWriter(reportFileName))
             {
                 writer.Write(reportString);
@@ -54,7 +54,7 @@ namespace FileCataloger
                 {
                     var videoDetails = CompleteVideoDetails(file);
 
-                    sb.AppendLine($"\"{videoDetails.ActualFileDateTime}\",\"{videoDetails.FileInfo.FullName}\",\"{videoDetails.FileInfo.Length}\",\"{videoDetails.ActualFileDateTime.Year}\",\"{videoDetails.ActualFileDateTime.Month}\",\"{videoDetails.ActualFileDateTime.Day}\",\"{videoDetails.Height}\",\"{videoDetails.Width}\",\"{videoDetails.Duration}\",\"{videoDetails.PossibleDuplicates}\"");
+                    sb.AppendLine($"\"{videoDetails.ActualFileDateTime:MM/dd/yyyy HH:mm:ss}\",\"{videoDetails.FileInfo.FullName}\",\"{videoDetails.FileInfo.Length}\",\"{videoDetails.ActualFileDateTime.Year}\",\"{videoDetails.ActualFileDateTime.Month}\",\"{videoDetails.ActualFileDateTime.Day}\",\"{videoDetails.Height}\",\"{videoDetails.Width}\",\"{videoDetails.Duration}\",\"{videoDetails.PossibleDuplicates}\"");
                 }
             }
 

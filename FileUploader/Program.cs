@@ -45,6 +45,7 @@ namespace FileUploader
             
             filesToUpload = filesToUpload.Where(f => f.ActualFileDateTime >= _uploaderConfiguration.OldestFileDate
                                                 && f.ActualFileDateTime < _uploaderConfiguration.NewestFileDate)
+                                                .OrderBy(f => f.ActualFileDateTime)
                                                 .ToList();
 
             Console.WriteLine($"Loaded {filesToUpload.Count} records for upload");
