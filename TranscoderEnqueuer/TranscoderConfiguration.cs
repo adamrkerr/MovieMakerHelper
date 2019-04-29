@@ -6,9 +6,18 @@ using System.Threading.Tasks;
 
 namespace TranscoderEnqueuer
 {
+    internal enum TranscoderFunctions
+    {
+        Subtitle,
+        Rotate,
+        Compile,
+        Test
+    }
+
     internal class TranscoderConfiguration
     {
         public string RegionName { get; internal set; }
         public string ArchiveBucketRoot { get; internal set; }
+        public TranscoderFunctions CurrentFunction { get; set; }
     }
 }
