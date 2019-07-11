@@ -5,6 +5,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -148,73 +149,23 @@ namespace TranscoderEnqueuer
             }
         }
 
+        const string CAPTIONS_SELECTOR = "Captions Selector 1";
+
         private static void EnqueueConversion(List<VideoSummary> files)
         {
-            var minYear = files.Select(f => f.ActualFileDateTime.Year).Min();
-
-            var jobRequest = new CreateJobRequest()
-            {
-                //Queue
-                Role = _transcoderConfiguration.JobRoleName,
-                StatusUpdateInterval = StatusUpdateInterval.SECONDS_60,
-                Settings = new JobSettings
-                {
-                    OutputGroups = new List<OutputGroup>
-                    {
-                        new OutputGroup
-                        {
-                            Name = "File Group",
-                            OutputGroupSettings = new OutputGroupSettings
-                            {
-                                Type = OutputGroupType.FILE_GROUP_SETTINGS,
-                                FileGroupSettings = new FileGroupSettings
-                                {
-                                    Destination = $"s3://{_transcoderConfiguration.DestinationBucketRoot}/{minYear}/{files.Select(f => f.ActualFileDateTime).Min():yyyyMM}"
-                                }
-                            },
-                            Outputs = new List<Output>
-                            {
-                                new Output
-                                {
-                                    Preset = "System-Generic_Hd_Mp4_Avc_Aac_16x9_1280x720p_24Hz_4.5Mbps", //may need to adjust this
-                                    CaptionDescriptions = new List<CaptionDescription>
-                                    {
-                                        new CaptionDescription
-                                        {
-                                            CaptionSelectorName = "Captions Selector 1",
-                                            LanguageCode = LanguageCode.ENG,
-                                            DestinationSettings = new CaptionDestinationSettings
-                                            {
-                                                DestinationType = CaptionDestinationType.BURN_IN,
-                                                BurninDestinationSettings = new BurninDestinationSettings
-                                                {
-                                                    Alignment = BurninSubtitleAlignment.LEFT,
-                                                    TeletextSpacing = BurninSubtitleTeletextSpacing.FIXED_GRID,
-                                                    OutlineSize = 2,
-                                                    ShadowColor = BurninSubtitleShadowColor.NONE,
-                                                    FontOpacity = 255,
-                                                    FontSize = 0,
-                                                    FontScript = FontScript.AUTOMATIC,
-                                                    FontColor = BurninSubtitleFontColor.WHITE,
-                                                    BackgroundColor = BurninSubtitleBackgroundColor.NONE,
-                                                    FontResolution = 96,
-                                                    OutlineColor = BurninSubtitleOutlineColor.BLACK
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    Inputs = new List<Input>()
-                }
-            };
+            var minDate = files.Select(f => f.ActualFileDateTime).Min();
+            var jobRequest = GenerateJobRequest(minDate);
 
             var previousDate = DateTime.MinValue;
 
             foreach (var file in files.OrderBy(f => f.ActualFileDateTime))
             {
+
+                //3gp seems to have audio codec problems
+                if (file.FileName.EndsWith(".3gp", true, CultureInfo.CurrentCulture)){
+                    Console.WriteLine($"UNSUPPORTED: {file.FileName}");
+                    continue;
+                }
 
                 var input = GetDefaultInput();
 
@@ -225,15 +176,31 @@ namespace TranscoderEnqueuer
                 {
                     Console.WriteLine($"{file.ActualFileDateTime.Date}");
 
-                    input.CaptionSelectors.Add("Captions Selector 1", new CaptionSelector
+                    input.CaptionSelectors.Add(CAPTIONS_SELECTOR, new CaptionSelector
                     {
                         LanguageCode = LanguageCode.ENG,
                         SourceSettings = new CaptionSourceSettings
                         {
-                            SourceType = CaptionSourceType.SRT,                            
+                            SourceType = CaptionSourceType.SRT,
                             FileSourceSettings = new FileSourceSettings
                             {
                                 SourceFile = $"s3://{_transcoderConfiguration.ArchiveBucketRoot}/{file.ActualFileDateTime.Year}/{file.ActualFileDateTime.Month}/subtitles/{file.ActualFileDateTime.Date:yyyyMMdd}.srt"
+                            }
+                        }
+                    });
+                }
+                else
+                {
+                    //have to add a blank caption when we don't want one to show
+                    input.CaptionSelectors.Add(CAPTIONS_SELECTOR, new CaptionSelector
+                    {
+                        LanguageCode = LanguageCode.ENG,
+                        SourceSettings = new CaptionSourceSettings
+                        {
+                            SourceType = CaptionSourceType.SRT,
+                            FileSourceSettings = new FileSourceSettings
+                            {
+                                SourceFile = $"s3://{_transcoderConfiguration.ArchiveBucketRoot}/blank.srt"
                             }
                         }
                     });
@@ -261,7 +228,7 @@ namespace TranscoderEnqueuer
                 Console.WriteLine("Generation cancelled.");
                 return;
             }
-            
+
             Console.WriteLine("Beginning video generation.");
 
             var config = new AmazonMediaConvertConfig
@@ -304,6 +271,69 @@ namespace TranscoderEnqueuer
             Console.WriteLine("Video generation complete.");
         }
 
+        private static CreateJobRequest GenerateJobRequest(DateTime minDate)
+        {
+            var jobRequest = new CreateJobRequest()
+            {
+                //Queue
+                Role = _transcoderConfiguration.JobRoleName,
+                StatusUpdateInterval = StatusUpdateInterval.SECONDS_60,
+                Settings = new JobSettings
+                {
+                    OutputGroups = new List<OutputGroup>
+                    {
+                        new OutputGroup
+                        {
+                            Name = "File Group",
+                            OutputGroupSettings = new OutputGroupSettings
+                            {
+                                Type = OutputGroupType.FILE_GROUP_SETTINGS,
+                                FileGroupSettings = new FileGroupSettings
+                                {
+                                    Destination = $"s3://{_transcoderConfiguration.DestinationBucketRoot}/{minDate.Year}/{minDate:yyyyMM}"
+                                }
+                            },
+                            Outputs = new List<Output>
+                            {
+                                new Output
+                                {
+                                    Preset = "System-Generic_Hd_Mp4_Avc_Aac_16x9_1280x720p_24Hz_4.5Mbps", //may need to adjust this
+                                    CaptionDescriptions = new List<CaptionDescription>
+                                    {
+                                        new CaptionDescription
+                                        {
+                                            CaptionSelectorName = CAPTIONS_SELECTOR,
+                                            LanguageCode = LanguageCode.ENG,
+                                            DestinationSettings = new CaptionDestinationSettings
+                                            {
+                                                DestinationType = CaptionDestinationType.BURN_IN,
+                                                BurninDestinationSettings = new BurninDestinationSettings
+                                                {
+                                                    Alignment = BurninSubtitleAlignment.LEFT,
+                                                    TeletextSpacing = BurninSubtitleTeletextSpacing.FIXED_GRID,
+                                                    OutlineSize = 2,
+                                                    ShadowColor = BurninSubtitleShadowColor.NONE,
+                                                    FontOpacity = 255,
+                                                    FontSize = 0,
+                                                    FontScript = FontScript.AUTOMATIC,
+                                                    FontColor = BurninSubtitleFontColor.WHITE,
+                                                    BackgroundColor = BurninSubtitleBackgroundColor.NONE,
+                                                    FontResolution = 96,
+                                                    OutlineColor = BurninSubtitleOutlineColor.BLACK
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    Inputs = new List<Input>()
+                }
+            };
+            return jobRequest;
+        }
+
         private static Input GetDefaultInput()
         {
             var input = new Input();
@@ -311,7 +341,7 @@ namespace TranscoderEnqueuer
             input.AudioSelectors.Add("Audio Selector 1", new AudioSelector
             {
                 Offset = 0,
-                DefaultSelection = "DEFAULT",
+                DefaultSelection = AudioDefaultSelection.DEFAULT,
                 ProgramSelection = 1
             });
 
