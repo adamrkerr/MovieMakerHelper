@@ -1,5 +1,6 @@
 ﻿using Amazon;
 using Amazon.MediaConvert;
+using Amazon.MediaConvert.Model;
 using Amazon.S3;
 using Amazon.S3.Model;
 using System;
@@ -55,7 +56,14 @@ namespace TranscoderEnqueuer
                     break;
             }
 
-            Console.ReadKey();
+            Console.WriteLine("Enter \"X\" to quit, any other key to run again.");
+
+            var cont = Console.ReadLine();
+
+            if (!cont.Equals("X", StringComparison.CurrentCultureIgnoreCase))
+            {
+                Main(args);
+            }
         }
 
         private static void ListFiles(List<VideoSummary> files)
@@ -113,13 +121,13 @@ namespace TranscoderEnqueuer
 
         private static void WriteSubtitleFilesToS3(Dictionary<DateTime, string> textDictionary)
         {
-            using (var awsClient = new AmazonS3Client(GetConfig()))
+            using (var awsClient = new AmazonS3Client(GetCredentials(), GetConfig()))
             {
                 foreach(var date in textDictionary)
                 {
                     var putRequest = new PutObjectRequest
                     {
-                        BucketName = $"{_transcoderConfiguration.ArchiveBucketRoot}/{date.Key.Year}/{date.Key.Month}",
+                        BucketName = $"{_transcoderConfiguration.ArchiveBucketRoot}/{date.Key.Year}/{date.Key.Month}/subtitles",
                         Key = $"{date.Key:yyyyMMdd}.srt",
                         ContentBody = date.Value,                        
                         StorageClass = S3StorageClass.ReducedRedundancy //this is easily regenerated
@@ -142,9 +150,100 @@ namespace TranscoderEnqueuer
 
         private static void EnqueueConversion(List<VideoSummary> files)
         {
+            var minYear = files.Select(f => f.ActualFileDateTime.Year).Min();
+
+            var jobRequest = new CreateJobRequest()
+            {
+                //Queue
+                Role = _transcoderConfiguration.JobRoleName,
+                StatusUpdateInterval = StatusUpdateInterval.SECONDS_60,
+                Settings = new JobSettings
+                {
+                    OutputGroups = new List<OutputGroup>
+                    {
+                        new OutputGroup
+                        {
+                            Name = "File Group",
+                            OutputGroupSettings = new OutputGroupSettings
+                            {
+                                Type = OutputGroupType.FILE_GROUP_SETTINGS,
+                                FileGroupSettings = new FileGroupSettings
+                                {
+                                    Destination = $"s3://{_transcoderConfiguration.DestinationBucketRoot}/{minYear}/{files.Select(f => f.ActualFileDateTime).Min():yyyyMM}"
+                                }
+                            },
+                            Outputs = new List<Output>
+                            {
+                                new Output
+                                {
+                                    Preset = "System-Generic_Hd_Mp4_Avc_Aac_16x9_1280x720p_24Hz_4.5Mbps", //may need to adjust this
+                                    CaptionDescriptions = new List<CaptionDescription>
+                                    {
+                                        new CaptionDescription
+                                        {
+                                            CaptionSelectorName = "Captions Selector 1",
+                                            LanguageCode = LanguageCode.ENG,
+                                            DestinationSettings = new CaptionDestinationSettings
+                                            {
+                                                DestinationType = CaptionDestinationType.BURN_IN,
+                                                BurninDestinationSettings = new BurninDestinationSettings
+                                                {
+                                                    Alignment = BurninSubtitleAlignment.LEFT,
+                                                    TeletextSpacing = BurninSubtitleTeletextSpacing.FIXED_GRID,
+                                                    OutlineSize = 2,
+                                                    ShadowColor = BurninSubtitleShadowColor.NONE,
+                                                    FontOpacity = 255,
+                                                    FontSize = 0,
+                                                    FontScript = FontScript.AUTOMATIC,
+                                                    FontColor = BurninSubtitleFontColor.WHITE,
+                                                    BackgroundColor = BurninSubtitleBackgroundColor.NONE,
+                                                    FontResolution = 96,
+                                                    OutlineColor = BurninSubtitleOutlineColor.BLACK
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    Inputs = new List<Input>()
+                }
+            };
+
+            var previousDate = DateTime.MinValue;
+
             foreach (var file in files.OrderBy(f => f.ActualFileDateTime))
             {
-                Console.WriteLine($"{file.ActualFileDateTime} - {file.ARN} {file.RunTime}");
+
+                var input = GetDefaultInput();
+
+                input.FileInput = $"s3://{file.ARN}";
+
+                //if this is a new date, add the caption
+                if (file.ActualFileDateTime.Date != previousDate)
+                {
+                    Console.WriteLine($"{file.ActualFileDateTime.Date}");
+
+                    input.CaptionSelectors.Add("Captions Selector 1", new CaptionSelector
+                    {
+                        LanguageCode = LanguageCode.ENG,
+                        SourceSettings = new CaptionSourceSettings
+                        {
+                            SourceType = CaptionSourceType.SRT,                            
+                            FileSourceSettings = new FileSourceSettings
+                            {
+                                SourceFile = $"s3://{_transcoderConfiguration.ArchiveBucketRoot}/{file.ActualFileDateTime.Year}/{file.ActualFileDateTime.Month}/subtitles/{file.ActualFileDateTime.Date:yyyyMMdd}.srt"
+                            }
+                        }
+                    });
+                }
+
+                Console.WriteLine($"{file.ActualFileDateTime} - {file.FileName} {file.RunTime}");
+
+                jobRequest.Settings.Inputs.Add(input);
+
+                previousDate = file.ActualFileDateTime.Date;
             }
 
             var totalRunTimeSeconds = files.Sum(t => t.RunTime.TotalSeconds);
@@ -153,15 +252,88 @@ namespace TranscoderEnqueuer
 
             Console.WriteLine($"Total run time would be {totalRunTime}");
 
-            //using (var mediaClient = new AmazonMediaConvertClient(RegionEndpoint.GetBySystemName(_transcoderConfiguration.RegionName)))
-            //{
-            //    //mediaClient.
-            //}
+            Console.WriteLine("Enter \"Y\" to generate the above job. Enter any other key to discard.");
+
+            var confirm = Console.ReadLine();
+
+            if (!confirm.Equals("Y", StringComparison.CurrentCultureIgnoreCase))
+            {
+                Console.WriteLine("Generation cancelled.");
+                return;
+            }
+            
+            Console.WriteLine("Beginning video generation.");
+
+            var config = new AmazonMediaConvertConfig
+            {
+                RegionEndpoint = RegionEndpoint.GetBySystemName(_transcoderConfiguration.RegionName)
+            };
+
+            //one call against region to get endpoint
+            using (var mediaClient = new AmazonMediaConvertClient(GetCredentials(), config))
+            {
+                //get the endpoint
+
+                var epResponse = mediaClient.DescribeEndpoints(new DescribeEndpointsRequest());
+
+                if (epResponse.HttpStatusCode != System.Net.HttpStatusCode.OK || epResponse.Endpoints.Count < 1)
+                {
+                    Console.WriteLine("Unable to get video generation endpoint.");
+                    return;
+                }
+
+                config.RegionEndpoint = null;
+                config.ServiceURL = epResponse.Endpoints[0].Url;
+            }
+
+            //now we have the specific endpoint
+            using (var mediaClient = new AmazonMediaConvertClient(GetCredentials(), config))
+            {
+                var result = mediaClient.CreateJob(jobRequest);
+
+                if (result.HttpStatusCode >= System.Net.HttpStatusCode.OK && (int)result.HttpStatusCode < 300)
+                {
+                    Console.WriteLine($"Created video job {result.Job.Arn}");
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to create job, error {result.HttpStatusCode}");
+                }
+            }
+
+            Console.WriteLine("Video generation complete.");
+        }
+
+        private static Input GetDefaultInput()
+        {
+            var input = new Input();
+
+            input.AudioSelectors.Add("Audio Selector 1", new AudioSelector
+            {
+                Offset = 0,
+                DefaultSelection = "DEFAULT",
+                ProgramSelection = 1
+            });
+
+            input.VideoSelector = new VideoSelector
+            {
+                ColorSpace = ColorSpace.FOLLOW,
+                Rotate = InputRotate.AUTO
+            };
+
+            input.FilterEnable = InputFilterEnable.AUTO;
+            input.PsiControl = InputPsiControl.USE_PSI;
+            input.FilterStrength = 0;
+            input.DeblockFilter = InputDeblockFilter.DISABLED;
+            input.DenoiseFilter = InputDenoiseFilter.DISABLED;
+            input.TimecodeSource = InputTimecodeSource.EMBEDDED;
+
+            return input;
         }
 
         static List<VideoSummary> LoadFilesForMonth(int year, int month)
         {
-            using (var awsClient = new AmazonS3Client(GetConfig()))
+            using (var awsClient = new AmazonS3Client(GetCredentials(), GetConfig()))
             {
 
                 var listRequest = new ListObjectsV2Request
@@ -225,7 +397,7 @@ namespace TranscoderEnqueuer
         {
             return new AmazonS3Config
             {
-                RegionEndpoint = RegionEndpoint.GetBySystemName(_transcoderConfiguration.RegionName)
+                RegionEndpoint = RegionEndpoint.GetBySystemName(_transcoderConfiguration.RegionName),                
             };
         }
     }

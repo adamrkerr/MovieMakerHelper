@@ -18,5 +18,7 @@ namespace TranscoderEnqueuer
         public string RegionName { get; internal set; }
         public string ArchiveBucketRoot { get; internal set; }
         public TranscoderFunctions CurrentFunction { get; set; }
+        public string JobRoleName { get; internal set; }
+        public string DestinationBucketRoot { get; internal set; }
     }
 }
