@@ -9,7 +9,6 @@ namespace TranscoderEnqueuer
     internal enum TranscoderFunctions
     {
         Subtitle,
-        Rotate,
         Compile,
         Test
     }

@@ -18,15 +18,34 @@ namespace TranscoderEnqueuer
         {
             _transcoderConfiguration = GetTranscoderConfiguration();
 
-            var files = LoadFilesForMonth(2016, 1);
+            int processYear = 0;
+
+            while (processYear == 0)
+            {
+                Console.WriteLine("For what year do you want to process videos?");
+
+                var yearString = Console.ReadLine();
+
+                int.TryParse(yearString, out processYear);
+            }
+
+            int processMonth = 0;
+
+            while (processMonth == 0)
+            {
+                Console.WriteLine("For what month do you want to process videos? (1-12)");
+
+                var monthString = Console.ReadLine();
+
+                int.TryParse(monthString, out processMonth);
+            }
+
+            var files = LoadFilesForMonth(processYear, processMonth);
 
             switch (_transcoderConfiguration.CurrentFunction)
             {
                 case TranscoderFunctions.Subtitle:
                     GenerateSubtitleFiles(files);
-                    break;
-                case TranscoderFunctions.Rotate:
-                    EnqueueRotation(files);
                     break;
                 case TranscoderFunctions.Compile:
                     EnqueueConversion(files);
@@ -53,33 +72,71 @@ namespace TranscoderEnqueuer
             Console.WriteLine($"Total run time would be {totalRunTime}");
         }
 
-        private static void EnqueueRotation(List<VideoSummary> files)
-        {
-            foreach(var file in files)
-            {
-                //we only care about "portrait" videos
-                if(file.Height < file.Width)
-                {
-                    continue;
-                }
-
-                Console.WriteLine($"{file.ARN} {file.Width} x {file.Height}");
-            }
-
-            Console.WriteLine("Video Rotation Enqueue Completed...");
-        }
-
         private static void GenerateSubtitleFiles(List<VideoSummary> files)
         {
+            Console.WriteLine("Generating subtitles...");
+
             var distinctDates = files.Select(f => f.ActualFileDateTime.Date).Distinct();
 
-            foreach(var date in distinctDates)
+            var textDictionary = new Dictionary<DateTime, string>();
+
+            foreach (var date in distinctDates)
             {
-                Console.WriteLine();
-                Console.WriteLine("1");
-                Console.WriteLine("00:00:00,500 --> 00:00:02,500");
-                Console.WriteLine($"{date:MM/dd/yyyy}");
-                Console.WriteLine();
+                var sb = new StringBuilder();
+                sb.AppendLine();
+                sb.AppendLine("1");
+                sb.AppendLine("00:00:00,500 --> 00:00:02,500");
+                sb.AppendLine($"{date:MM/dd/yyyy}");
+                sb.AppendLine();
+
+                textDictionary.Add(date, sb.ToString());
+
+                Console.WriteLine(textDictionary[date]);
+            }
+
+            Console.WriteLine("Enter \"Y\" to generate the above subtitle files. Enter any other key to discard.");
+
+            var confirm = Console.ReadLine();
+
+            if (!confirm.Equals("Y", StringComparison.CurrentCultureIgnoreCase))
+            {
+                Console.WriteLine("Generation cancelled.");
+                return;
+            }
+
+            Console.WriteLine("Beginning subtitle generation.");
+
+            WriteSubtitleFilesToS3(textDictionary);
+
+            Console.WriteLine("Subtitle generation complete.");
+        }
+
+        private static void WriteSubtitleFilesToS3(Dictionary<DateTime, string> textDictionary)
+        {
+            using (var awsClient = new AmazonS3Client(GetConfig()))
+            {
+                foreach(var date in textDictionary)
+                {
+                    var putRequest = new PutObjectRequest
+                    {
+                        BucketName = $"{_transcoderConfiguration.ArchiveBucketRoot}/{date.Key.Year}/{date.Key.Month}",
+                        Key = $"{date.Key:yyyyMMdd}.srt",
+                        ContentBody = date.Value,                        
+                        StorageClass = S3StorageClass.ReducedRedundancy //this is easily regenerated
+                    };
+
+                    var result = awsClient.PutObject(putRequest);
+
+                    if(result.HttpStatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        Console.WriteLine($"Created subtitle file \"{putRequest.BucketName}/{putRequest.Key}\"");
+                    }
+                    else
+                    {
+
+                        Console.WriteLine($"Failed to create subtitle file \"{putRequest.BucketName}/{putRequest.Key}\", error {result.HttpStatusCode}");
+                    }
+                }
             }
         }
 
@@ -107,7 +164,7 @@ namespace TranscoderEnqueuer
             using (var awsClient = new AmazonS3Client(GetConfig()))
             {
 
-                ListObjectsV2Request listRequest = new ListObjectsV2Request
+                var listRequest = new ListObjectsV2Request
                 {
                     BucketName = _transcoderConfiguration.ArchiveBucketRoot,
                     Prefix = $"{year}/{month}/"
@@ -119,7 +176,7 @@ namespace TranscoderEnqueuer
                                 .Select(v => ConvertToVideoSummary(v, awsClient))
                                 .Where(v => v != null) //filter out other files
                                 .ToList();
-                
+
                 return summaries;
             }
         }
