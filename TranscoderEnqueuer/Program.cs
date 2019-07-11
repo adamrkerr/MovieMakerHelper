@@ -44,13 +44,41 @@ namespace TranscoderEnqueuer
 
             var files = LoadFilesForMonth(processYear, processMonth);
 
-            switch (_transcoderConfiguration.CurrentFunction)
+            Console.WriteLine("What do you want to do?");
+            Console.WriteLine("1) Subtitle");
+            Console.WriteLine("2) Compile");
+            Console.WriteLine("3) Subtitle & Compile");
+            Console.WriteLine("4) Test");
+            Console.WriteLine("5) Exit");
+
+            int command = 0;
+
+            while (command == 0)
+            {
+                var commandString = Console.ReadLine();
+
+                int.TryParse(commandString, out command);
+
+                if(command < 1 || command > 5)
+                {
+                    command = 0;
+                }
+            }
+            
+            switch ((TranscoderFunctions)command)
             {
                 case TranscoderFunctions.Subtitle:
                     GenerateSubtitleFiles(files);
                     break;
                 case TranscoderFunctions.Compile:
                     EnqueueConversion(files);
+                    break;
+                case TranscoderFunctions.SubtitleAndCompile:
+                    if (GenerateSubtitleFiles(files))
+                    {
+                        //only do this if above was ok
+                        EnqueueConversion(files);
+                    }
                     break;
                 case TranscoderFunctions.Test:
                     ListFiles(files);
@@ -81,7 +109,7 @@ namespace TranscoderEnqueuer
             Console.WriteLine($"Total run time would be {totalRunTime}");
         }
 
-        private static void GenerateSubtitleFiles(List<VideoSummary> files)
+        private static bool GenerateSubtitleFiles(List<VideoSummary> files)
         {
             Console.WriteLine("Generating subtitles...");
 
@@ -110,7 +138,7 @@ namespace TranscoderEnqueuer
             if (!confirm.Equals("Y", StringComparison.CurrentCultureIgnoreCase))
             {
                 Console.WriteLine("Generation cancelled.");
-                return;
+                return false;
             }
 
             Console.WriteLine("Beginning subtitle generation.");
@@ -118,6 +146,8 @@ namespace TranscoderEnqueuer
             WriteSubtitleFilesToS3(textDictionary);
 
             Console.WriteLine("Subtitle generation complete.");
+
+            return true;
         }
 
         private static void WriteSubtitleFilesToS3(Dictionary<DateTime, string> textDictionary)
