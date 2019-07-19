@@ -48,8 +48,9 @@ namespace TranscoderEnqueuer
             Console.WriteLine("1) Subtitle");
             Console.WriteLine("2) Compile");
             Console.WriteLine("3) Subtitle & Compile");
-            Console.WriteLine("4) Test");
-            Console.WriteLine("5) Exit");
+            Console.WriteLine("4) Glacierize");
+            Console.WriteLine("5) Test");
+            Console.WriteLine("6) Exit");
 
             int command = 0;
 
@@ -59,7 +60,7 @@ namespace TranscoderEnqueuer
 
                 int.TryParse(commandString, out command);
 
-                if(command < 1 || command > 5)
+                if(command < 1 || command > 6)
                 {
                     command = 0;
                 }
@@ -80,6 +81,9 @@ namespace TranscoderEnqueuer
                         EnqueueConversion(files);
                     }
                     break;
+                case TranscoderFunctions.Glacierize:
+                    Glacierize(files);
+                    break;
                 case TranscoderFunctions.Test:
                     ListFiles(files);
                     break;
@@ -92,6 +96,53 @@ namespace TranscoderEnqueuer
             if (!cont.Equals("X", StringComparison.CurrentCultureIgnoreCase))
             {
                 Main(args);
+            }
+        }
+
+        private static void Glacierize(List<VideoSummary> files)
+        {
+            Console.WriteLine($"Enter \"Y\" to glacierize {files.Count} files. Enter any other key to return.");
+
+            var confirm = Console.ReadLine();
+
+            if (!confirm.Equals("Y", StringComparison.CurrentCultureIgnoreCase))
+            {
+                Console.WriteLine("Glacierization cancelled.");
+                return;
+            }
+
+            using(var client = new AmazonS3Client(GetCredentials(), GetConfig()))
+            {
+                foreach(var file in files)
+                {
+                    //3gp seems to have audio codec problems
+                    if (file.FileName.EndsWith(".3gp", true, CultureInfo.CurrentCulture))
+                    {
+                        Console.WriteLine($"UNSUPPORTED: {file.FileName}");
+                        continue;
+                    }
+
+                    var request = new CopyObjectRequest()
+                    {
+                        DestinationBucket = _transcoderConfiguration.ArchiveBucketRoot,
+                        DestinationKey = file.ARN.Replace(_transcoderConfiguration.ArchiveBucketRoot, string.Empty),
+                        SourceBucket = _transcoderConfiguration.ArchiveBucketRoot,
+                        SourceKey = file.ARN.Replace(_transcoderConfiguration.ArchiveBucketRoot, string.Empty),
+                        CannedACL = S3CannedACL.Private,
+                        StorageClass = S3StorageClass.Glacier
+                    };
+
+                    var result = client.CopyObject(request);
+
+                    if ((int)result.HttpStatusCode < 200 || (int)result.HttpStatusCode >= 300)
+                    {
+                        Console.WriteLine($"Failed glacierize file {file.ARN}, {result.HttpStatusCode}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Glacierized file {file.ARN}");
+                    }
+                }
             }
         }
 

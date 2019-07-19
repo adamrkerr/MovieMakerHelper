@@ -11,7 +11,8 @@ namespace TranscoderEnqueuer
         Subtitle = 1,
         Compile = 2,
         SubtitleAndCompile = 3,
-        Test = 4
+        Glacierize = 4,
+        Test = 5
     }
 
     internal class TranscoderConfiguration
