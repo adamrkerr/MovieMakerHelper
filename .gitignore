@@ -259,5 +259,6 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
-*/FileUploader/ProgramSecrets.cs
-*/TranscoderEnqueuer/ProgramSecrets.cs
+**/FileUploader/ProgramSecrets.cs
+**/TranscoderEnqueuer/ProgramSecrets.cs
+
