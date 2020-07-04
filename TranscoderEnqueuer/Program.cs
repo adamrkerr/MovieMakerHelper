@@ -378,7 +378,7 @@ namespace TranscoderEnqueuer
                             {
                                 new Output
                                 {
-                                    Preset = "System-Generic_Hd_Mp4_Avc_Aac_16x9_1280x720p_24Hz_4.5Mbps", //may need to adjust this
+                                    Preset = "System-Generic_Hd_Mp4_Avc_Aac_16x9_1920x1080p_24Hz_6Mbps", //may need to adjust this
                                     CaptionDescriptions = new List<CaptionDescription>
                                     {
                                         new CaptionDescription
