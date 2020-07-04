@@ -11,10 +11,10 @@ namespace FileCataloger
 {
     class Program
     {
-        private static DateTime _startDate = new DateTime(2016, 1, 1);
-        private static DateTime _endDate = new DateTime(2019, 1, 1);
+        private static DateTime _startDate = new DateTime(2014, 1, 1);
+        private static DateTime _endDate = new DateTime(2015, 1, 1);
         private const string _searchDirectory = "F:\\";
-        private const string _outputDirectoryFormat = "C:\\Users\\Adam\\Videos\\Reports\\{0}.csv";
+        private const string _outputDirectoryFormat = "C:\\Users\\Adam\\Videos\\Reports\\Old Drive {0}.csv";
         static readonly string[] _movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf", ".3gp" };
         static readonly string[] _ignoreNames = { "itunes", "top gear", "valve", "xgames", "top.gear", "pocket_lint", "fireproof",
             "\\zip disks\\", "\\videos\\", "\\local disk (g)\\movies\\", "\\my movies\\", "\\my documents\\my videos\\",
@@ -65,11 +65,22 @@ namespace FileCataloger
         [STAThread]
         private static VideoDetails CompleteVideoDetails(VideoDetails file)
         {
-            using (var video = new Video(file.FileInfo.FullName, false))
+            try
             {
-                file.Duration = video.Duration;
-                file.Height = video.DefaultSize.Height;
-                file.Width = video.DefaultSize.Width;
+                using (
+                    var video = new Video(file.FileInfo.FullName, false))
+                {
+                    file.Duration = video.Duration;
+                    file.Height = video.DefaultSize.Height;
+                    file.Width = video.DefaultSize.Width;
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Unable to get video details for file {file.FileInfo.FullName}, error: {ex.Message}");
+                file.Duration = -1;
+                file.Height = -1;
+                file.Width = -1;
             }
 
             return file;

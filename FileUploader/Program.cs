@@ -58,11 +58,15 @@ namespace FileUploader
             using (var awsClient = new AmazonS3Client(GetConfig()))
             {
                 await _progressStream.WriteLineAsync("Date,Path,Success");
+
+                var fileCounter = 1;
                 while (!_stopFlag && fileQueue.Any())
                 {
                     var detail = fileQueue.Dequeue();
                                         
-                    await UploadFile(awsClient, detail);
+                    await UploadFile(awsClient, detail, fileCounter, filesToUpload.Count);
+
+                    fileCounter++;
                 }
             }
 
@@ -79,7 +83,7 @@ namespace FileUploader
             };
         }
 
-        static async Task UploadFile(AmazonS3Client s3Client, VideoDetails detail)
+        static async Task UploadFile(AmazonS3Client s3Client, VideoDetails detail, int fileCounter, int totalCount)
         {
             Console.WriteLine($"Uploading file {detail.FileInfo.FullName}");
 
@@ -97,6 +101,7 @@ namespace FileUploader
                 //check for existing file with same name
                 fileKey = await GetUniqueFileKey(s3Client, detail, bucketName, fileKey);
 
+
                 var transferRequest = new TransferUtilityUploadRequest
                 {
                     BucketName = bucketName,
@@ -106,7 +111,7 @@ namespace FileUploader
                     Key = fileKey
                 };
 
-                transferRequest.UploadProgressEvent += new EventHandler<UploadProgressArgs>(WriteProgess);
+                transferRequest.UploadProgressEvent += new EventHandler<UploadProgressArgs>((sender, e) => WriteProgess(sender, e, fileCounter, totalCount));
                 transferRequest.TagSet = new List<Tag>
                 {
                     new Tag(){Key = nameof(VideoDetails.ActualFileDateTime), Value = detail.ActualFileDateTime.ToString()},
@@ -116,7 +121,7 @@ namespace FileUploader
                     new Tag(){Key = nameof(VideoDetails.Duration), Value = detail.Duration.ToString()},
                     new Tag(){Key = nameof(VideoDetails.Height), Value = detail.Height.ToString()},
                     new Tag(){Key = nameof(VideoDetails.Width), Value = detail.Width.ToString()},
-                    new Tag(){Key = "OriginalPath", Value = detail.FileInfo.FullName.Replace('\\', '/')},
+                    new Tag(){Key = "OriginalPath", Value = detail.FileInfo.FullName.Replace('\\', '/').Replace("'", "")},
                     new Tag(){Key = "Extension", Value = detail.FileInfo.Extension},
                     new Tag(){Key = "UploadedDate", Value = DateTime.Now.ToString()}
                 };
@@ -175,9 +180,9 @@ namespace FileUploader
             return fileKey;
         }
 
-        private static void WriteProgess(object sender, UploadProgressArgs e)
+        private static void WriteProgess(object sender, UploadProgressArgs e, int fileCounter, int totalCount)
         {
-            Console.WriteLine($"Uploaded {e.TransferredBytes} / {e.TotalBytes}, {e.PercentDone}%");
+            Console.WriteLine($"File {fileCounter} / {totalCount} - Uploaded {e.TransferredBytes} / {e.TotalBytes}, {e.PercentDone}%");
         }
 
         static async Task WaitForInput()
