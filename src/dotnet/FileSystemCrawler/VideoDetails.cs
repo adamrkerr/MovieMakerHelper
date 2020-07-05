@@ -8,7 +8,7 @@ namespace FileSystemCrawler
 {
     public class VideoDetails
     {
-        public VideoDetails(FileInfo fileInfo)
+        public VideoDetails(CrawlerFileInfo fileInfo)
         {
             FileInfo = fileInfo;
             ActualFileDateTime = GetActualFileDateTime(fileInfo);
@@ -22,11 +22,11 @@ namespace FileSystemCrawler
         public double Duration { get; set; }
         public int Height { get; set; }
         public int Width { get; set; }
-        public FileInfo FileInfo { get; set; }
+        public CrawlerFileInfo FileInfo { get; set; }
         public DateTime ActualFileDateTime { get; private set; }
         public int PossibleDuplicates { get; set; }
 
-        public static DateTime GetActualFileDateTime(FileInfo file)
+        public static DateTime GetActualFileDateTime(CrawlerFileInfo file)
         {
             var fileExtension = Path.GetExtension(file.Name);
 

@@ -18,6 +18,7 @@ namespace FileUploader
         static bool _stopFlag = false;
         static StreamWriter _progressStream = null;
         static UploaderConfiguration _uploaderConfiguration = GetUploaderConfiguration();
+        static WindowsCrawlerAssistant _windowsCrawlerAssistant = new WindowsCrawlerAssistant();
 
         static void Main(string[] args)
         {
@@ -213,7 +214,7 @@ namespace FileUploader
 
                     var detail = new VideoDetails(DateTime.Parse(cells[0]))
                     {
-                        FileInfo = new FileInfo(cells[1]),
+                        FileInfo = _windowsCrawlerAssistant.GetFileInfo(cells[1]),
                         Duration = double.Parse(cells[8]),
                         Height = int.Parse(cells[6]),
                         Width = int.Parse(cells[7])

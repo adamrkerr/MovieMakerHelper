@@ -24,7 +24,7 @@ namespace FileCataloger
         [STAThread]
         static void Main(string[] args)
         {
-            var uniqueFileCrawler = new UniqueFileCrawler(_ignoreNames, _movieExtensions);
+            var uniqueFileCrawler = new UniqueFileCrawler(new WindowsCrawlerAssistant(), _ignoreNames, _movieExtensions);
 
             var files = uniqueFileCrawler.CrawlFileSystem(_searchDirectory, _startDate, _endDate);
 

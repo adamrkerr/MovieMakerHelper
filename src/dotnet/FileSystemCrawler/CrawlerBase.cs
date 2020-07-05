@@ -8,10 +8,13 @@ namespace FileSystemCrawler
 {
     public abstract class CrawlerBase
     {
-        public CrawlerBase(IEnumerable<string> namesToIgnore, IEnumerable<string> extensionsToSearch)
+        private readonly ICrawlerAssistant _assistant;
+
+        public CrawlerBase(ICrawlerAssistant assistant, IEnumerable<string> namesToIgnore, IEnumerable<string> extensionsToSearch)
         {
             IgnoredNames = namesToIgnore.ToList();
             IncludedExtensions = extensionsToSearch.ToList();
+            this._assistant = assistant;
         }
 
         public List<string> IgnoredNames { get; set; }
@@ -29,25 +32,31 @@ namespace FileSystemCrawler
             }
 
             Console.WriteLine($"{minDate:MM/dd/yyyy} {maxDate:MM/dd/yyy} Directory: {startPath}");
+            
+            var fileNames = _assistant.GetFiles(startPath);
 
-            var directory = new DirectoryInfo(startPath);
+            var counter = 1;
 
-            var files = directory.GetFiles();
-
-            foreach (var file in files)
+            foreach (var fileName in fileNames)
             {
-                var fileExtension = Path.GetExtension(file.Name).ToLower();
+                Console.WriteLine($"Checking file {counter} of {fileNames.Count()}: {fileName}");
+                counter++;
 
-                if (!IncludedExtensions.Contains(fileExtension))
+                var fileExtension = Path.GetExtension(fileName).ToLower();
+
+                //Allow all extensions if empty
+                if (IncludedExtensions.Any() && !IncludedExtensions.Contains(fileExtension))
                 {
                     continue;
                 }
 
                 //filter stuff we know we don't want
-                if (IgnoredNames.Any(ig => file.FullName.ToLower().Contains(ig)))
+                if (IgnoredNames.Any(ig => fileName.ToLower().Contains(ig)))
                 {
                     continue;
                 }
+
+                var file = _assistant.GetFileInfo(fileName);
 
                 var date = VideoDetails.GetActualFileDateTime(file).Date;
 
@@ -64,21 +73,23 @@ namespace FileSystemCrawler
                 foundFiles[date].Add(new VideoDetails(file));
             }
 
-            var directories = directory.GetDirectories();
+            var directories = _assistant.GetDirectories(startPath);
 
             foreach (var childDirectory in directories)
             {
 
-                if (childDirectory.Attributes.HasFlag(FileAttributes.Hidden))
+                if (_assistant.IsHidden(childDirectory))
                     continue;
 
-                var childFiles = CrawlFileSystem(childDirectory.FullName, minDate, maxDate);
+                var childFiles = CrawlFileSystem(childDirectory, minDate, maxDate);
 
                 ProcessChildFiles(foundFiles, childFiles);
             }
 
             return foundFiles;
         }
+
+        
 
         protected abstract void ProcessChildFiles(Dictionary<DateTime, List<VideoDetails>> foundFiles, Dictionary<DateTime, List<VideoDetails>> childFiles);
 

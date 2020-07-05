@@ -9,7 +9,8 @@ namespace FileSystemCrawler
 
     public class UniqueFileCrawler : CrawlerBase
     {
-        public UniqueFileCrawler(IEnumerable<string> namesToIgnore, IEnumerable<string> extensionsToSearch) : base(namesToIgnore, extensionsToSearch) { }
+        public UniqueFileCrawler(ICrawlerAssistant assistant, IEnumerable<string> namesToIgnore, IEnumerable<string> extensionsToSearch) 
+            : base(assistant, namesToIgnore, extensionsToSearch) { }
         
         /// <summary>
         /// In this implementation, we filter out files that are duplicates.
