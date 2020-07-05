@@ -48,6 +48,8 @@ namespace FileUploader
                                                 .OrderBy(f => f.ActualFileDateTime)
                                                 .ToList();
 
+            var totalUploadSize = filesToUpload.Sum(f => f.FileInfo.Length);
+
             Console.WriteLine($"Loaded {filesToUpload.Count} records for upload");
 
             //put in a queue to make this easy
@@ -60,13 +62,15 @@ namespace FileUploader
                 await _progressStream.WriteLineAsync("Date,Path,Success");
 
                 var fileCounter = 1;
+                long totalUploadCounter = 0;
                 while (!_stopFlag && fileQueue.Any())
                 {
                     var detail = fileQueue.Dequeue();
                                         
-                    await UploadFile(awsClient, detail, fileCounter, filesToUpload.Count);
+                    await UploadFile(awsClient, detail, fileCounter, filesToUpload.Count, totalUploadCounter, totalUploadSize);
 
                     fileCounter++;
+                    totalUploadCounter += detail.FileInfo.Length;
                 }
             }
 
@@ -83,7 +87,7 @@ namespace FileUploader
             };
         }
 
-        static async Task UploadFile(AmazonS3Client s3Client, VideoDetails detail, int fileCounter, int totalCount)
+        static async Task UploadFile(AmazonS3Client s3Client, VideoDetails detail, int fileCounter, int totalCount, long totalCurrentUpload, long totalFinalUpload)
         {
             Console.WriteLine($"Uploading file {detail.FileInfo.FullName}");
 
@@ -111,7 +115,7 @@ namespace FileUploader
                     Key = fileKey
                 };
 
-                transferRequest.UploadProgressEvent += new EventHandler<UploadProgressArgs>((sender, e) => WriteProgess(sender, e, fileCounter, totalCount));
+                transferRequest.UploadProgressEvent += new EventHandler<UploadProgressArgs>((sender, e) => WriteProgess(sender, e, fileCounter, totalCount, totalCurrentUpload, totalFinalUpload));
                 transferRequest.TagSet = new List<Tag>
                 {
                     new Tag(){Key = nameof(VideoDetails.ActualFileDateTime), Value = detail.ActualFileDateTime.ToString()},
@@ -180,9 +184,9 @@ namespace FileUploader
             return fileKey;
         }
 
-        private static void WriteProgess(object sender, UploadProgressArgs e, int fileCounter, int totalCount)
+        private static void WriteProgess(object sender, UploadProgressArgs e, int fileCounter, int totalCount, long totalCurrentCount, long totalFinalCount)
         {
-            Console.WriteLine($"File {fileCounter} / {totalCount} - Uploaded {e.TransferredBytes} / {e.TotalBytes}, {e.PercentDone}%");
+            Console.WriteLine($"File {fileCounter} / {totalCount} - Uploaded {e.TransferredBytes} / {e.TotalBytes}, {e.PercentDone}%, Overall {((float)(totalCurrentCount + e.TransferredBytes)/(float)totalFinalCount) * 100}%");
         }
 
         static async Task WaitForInput()

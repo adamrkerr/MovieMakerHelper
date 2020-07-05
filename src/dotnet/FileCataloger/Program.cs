@@ -11,8 +11,8 @@ namespace FileCataloger
 {
     class Program
     {
-        private static DateTime _startDate = new DateTime(2014, 1, 1);
-        private static DateTime _endDate = new DateTime(2015, 1, 1);
+        private static DateTime _startDate = new DateTime(2013, 1, 1);
+        private static DateTime _endDate = new DateTime(2014, 1, 1);
         private const string _searchDirectory = "F:\\";
         private const string _outputDirectoryFormat = "C:\\Users\\Adam\\Videos\\Reports\\Old Drive {0}.csv";
         static readonly string[] _movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf", ".3gp" };
