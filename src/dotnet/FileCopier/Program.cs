@@ -11,13 +11,14 @@ namespace FileCopier
 {
     class Program
     {
-        private static DateTime _startDate = new DateTime(2020, 5, 1);
+        private static DateTime _startDate = new DateTime(2020, 1, 1);
         private static DateTime _endDate = new DateTime(2020, 8, 1);
         private const string _deviceName = "phone";
         private const string _searchDirectory = "\\Phone\\DCIM\\Camera";
-        private const string _targetDirectory = "F:\\Adam Phone 2020\\";
+        private const string _targetDirectory = "F:\\Phone 2020\\";
         static readonly string[] _ignoreNames = {"\\2015", "\\2016", "\\2017", "\\2018", "\\2019",
-            "\\202001", "\\202002", "\\202003", "\\202004"};
+            //"\\202001", "\\202002", "\\202003", "\\202004"
+        };
 
         [STAThread]
         static void Main(string[] args)
@@ -51,6 +52,11 @@ namespace FileCopier
                 Console.WriteLine($"Copying file {file.FileInfo.FullName} to {targetDirectory}\\{file.ActualFileDateTime.Month:00}");
 
                 var targetPath = Path.Combine(targetDirectory, $"{file.ActualFileDateTime.Month:00}");
+
+                if (!Directory.Exists(targetPath))
+                {
+                    Directory.CreateDirectory(targetPath);
+                }
 
                 targetPath = Path.Combine(targetPath, file.FileInfo.Name);
 
