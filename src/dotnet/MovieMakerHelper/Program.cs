@@ -1,4 +1,5 @@
-﻿using Microsoft.DirectX.AudioVideoPlayback;
+﻿using FileSystemCrawler;
+using Microsoft.DirectX.AudioVideoPlayback;
 using Shell32;
 using System;
 using System.Collections.Generic;
@@ -14,25 +15,29 @@ namespace MovieMakerHelper
 
     class Program
     {
-        private static DateTime _startDate = new DateTime(2005, 1, 1);
-        private static DateTime _endDate = new DateTime(2014, 1, 1);
-        private const string _searchDirectory = "G:\\";
+        private static DateTime _startDate = new DateTime(2017, 11, 1);
+        private static DateTime _endDate = new DateTime(2018, 2, 1);
+        private const string _searchDirectory = "F:\\";
         private const string _outputDirectoryFormat = "C:\\Users\\Adam\\Videos\\generated\\{0}.wlmp";
         private const string _dividerPath = "C:\\Users\\Adam\\Videos\\Pure Black.png";
         static readonly string[] _movieExtensions = { ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg", ".asf", ".3gp" };
         static readonly string[] _ignoreNames = { "itunes", "top gear", "valve", "xgames", "top.gear", "pocket_lint", "fireproof",
-            "\\zip disks\\", "\\videos\\", "\\local disk (g)\\movies\\", "\\my movies\\", "\\my documents\\my videos\\", "gopr", "g0pr" };
+            "\\zip disks\\", "\\videos\\", "\\local disk (g)\\movies\\", "\\my movies\\", "\\my documents\\my videos\\", "gopr", "g0pr",
+            "video0054.mp4", "video0056.mp4", "video0058.mp4", "video0061.mp4", "video0062.mp4", "video0063.mp4", "video0068.mp4",
+            "video0072.mp4", "video0070.mp4", "video0071.mp4" };
 
         [STAThread]
         static void Main(string[] args)
         {
             var currentStartTime = _startDate;
-            var currentEndTime = _startDate.AddYears(1);
+            var currentEndTime = _startDate.AddMonths(1);
             //var currentEndTime = _endDate;
+
+            var uniqueFileCrawler = new UniqueFileCrawler(_ignoreNames, _movieExtensions);
 
             while (currentEndTime <= _endDate)
             {
-                var files = CrawlFileSystem(_searchDirectory, currentStartTime, currentEndTime);
+                var files = uniqueFileCrawler.CrawlFileSystem(_searchDirectory, currentStartTime, currentEndTime);
 
                 var project = GenerateDefaultProject($"{currentStartTime:yyyyMMdd} to {currentEndTime:yyyyMMdd}");
 
@@ -46,13 +51,13 @@ namespace MovieMakerHelper
                 }
 
                 currentStartTime = currentEndTime;
-                currentEndTime = currentEndTime.AddYears(1);
+                currentEndTime = currentEndTime.AddMonths(1);
             }
         }
 
 
         [STAThread]
-        private static void AddFilesToProject(Project project, Dictionary<DateTime, List<FileInfo>> files)
+        private static void AddFilesToProject(Project project, Dictionary<DateTime, List<VideoDetails>> files)
         {
             var mediaItems = new List<ProjectMediaItem>();
             var mediaItemCounter = 1;
@@ -74,7 +79,7 @@ namespace MovieMakerHelper
 
             foreach (var dateKey in files.Keys.OrderBy(k => k))
             {
-                var filesForDate = files[dateKey].OrderBy(f => GetActualFileDateTime(f));
+                var filesForDate = files[dateKey].OrderBy(f => f.ActualFileDateTime);
 
                 var isFirst = true;
 
@@ -89,7 +94,7 @@ namespace MovieMakerHelper
                     var mediaItem = new ProjectMediaItem
                     {
                         id = $"{mediaItemCounter}",
-                        filePath = file.FullName,
+                        filePath = file.FileInfo.FullName,
                         arWidth = videoDetails.Width.ToString(), //TODO
                         arHeight = videoDetails.Height.ToString(), //TODO
                         duration = videoDetails.Duration.ToString(), //TODO
@@ -522,17 +527,15 @@ namespace MovieMakerHelper
         }
 
         [STAThread]
-        private static VideoDetails GetVideoDetails(FileInfo file)
+        private static VideoDetails GetVideoDetails(VideoDetails file)
         {
-            using (var video = new Video(file.FullName, false))
+            using (var video = new Video(file.FileInfo.FullName, false))
             {
-                return new VideoDetails
-                {
-                    Duration = video.Duration,
-                    Height = video.DefaultSize.Height,
-                    Width = video.DefaultSize.Width
-                };
+                file.Duration = video.Duration;
+                file.Height = video.DefaultSize.Height;
+                file.Width = video.DefaultSize.Width;
             }
+            return file;
         }
 
         private static BoundProperties GenerateDefaultVideoBoundProperties()
@@ -558,122 +561,7 @@ namespace MovieMakerHelper
 
             return boundProperties;
         }
-                
-        static Dictionary<DateTime, List<FileInfo>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
-        {
 
-            var foundFiles = new Dictionary<DateTime, List<FileInfo>>();
-
-            //ignore whole directories
-            if(_ignoreNames.Any(ig => startPath.ToLower().Contains(ig)))
-            {
-                return foundFiles;
-            }
-
-            Console.WriteLine($"{minDate:MM/dd/yyyy} {maxDate:MM/dd/yyy} Directory: {startPath}");
-
-            var directory = new DirectoryInfo(startPath);
-            
-            var files = directory.GetFiles();
-
-            foreach (var file in files)
-            {
-                var fileExtension = Path.GetExtension(file.Name).ToLower();
-
-                if (!_movieExtensions.Contains(fileExtension))
-                {
-                    continue;
-                }
-
-                //filter stuff we know we don't want
-                if (_ignoreNames.Any(ig => file.FullName.ToLower().Contains(ig)))
-                {
-                    continue;
-                }
-
-                var date = GetActualFileDateTime(file).Date;
-
-                if (date < minDate || date >= maxDate)
-                {
-                    continue;
-                }
-                
-                if (!foundFiles.ContainsKey(date))
-                {
-                    foundFiles.Add(date, new List<FileInfo>());
-                }
-
-                foundFiles[date].Add(file);
-            }
-
-            var directories = directory.GetDirectories();
-
-            foreach (var childDirectory in directories)
-            {
-
-                if (childDirectory.Attributes.HasFlag(FileAttributes.Hidden))
-                    continue;
-
-                var childFiles = CrawlFileSystem(childDirectory.FullName, minDate, maxDate);
-
-                foreach (var date in childFiles.Keys)
-                {
-                    if (!foundFiles.ContainsKey(date))
-                    {
-                        foundFiles.Add(date, new List<FileInfo>());
-                    }
-
-                    foreach (var newFile in childFiles[date])
-                    {
-                        //unlikely that two files with same name and same exact file size would not be the duplicates
-                        var existing = foundFiles[date].FirstOrDefault(f => f.Name == newFile.Name && f.Length == newFile.Length);
-                        if (existing == null)
-                        {
-                            foundFiles[date].Add(newFile);
-                        }
-                        else
-                        {
-                            Console.WriteLine($"Found possible duplicate file: {existing.FullName} -- {newFile.FullName}");
-                        }
-                    }
-
-                }
-            }
-
-            return foundFiles;
-        }
-
-        static DateTime GetActualFileDateTime(FileInfo file)
-        {
-            var fileExtension = Path.GetExtension(file.Name);
-
-            var date = file.LastWriteTime <= file.CreationTime ? file.LastWriteTime : file.CreationTime;
-
-            var name = file.Name.Remove(file.Name.Length - fileExtension.Length);
-
-            if (name.Length >= 15)
-            {
-                if (DateTime.TryParseExact(name.Substring(0, 15), "yyyyMMdd_HHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    if (date != parsedDate)
-                    {
-                        date = parsedDate;
-                    }
-                }
-            }
-            else if (name.Length == 14)
-            {
-                if (DateTime.TryParseExact(name.Substring(0, 14), "yyyyMMddHHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    if (date != parsedDate)
-                    {
-                        date = parsedDate;
-                    }
-                }
-            }
-
-            return date;
-        }
 
         static Project GenerateDefaultProject(string projectName)
         {
@@ -755,10 +643,4 @@ namespace MovieMakerHelper
         }
     }
 
-    class VideoDetails
-    {
-        public double Duration { get; set; }
-        public int Height { get; set; }
-        public int Width { get; set; }
-    }
 }
