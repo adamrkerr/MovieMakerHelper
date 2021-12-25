@@ -17,7 +17,17 @@ namespace FileCopier
         private const string _searchDirectory = "\\Phone\\DCIM\\Camera";
         private const string _targetDirectory = "F:\\Phone 2020\\";
         static readonly string[] _ignoreNames = {"\\2015", "\\2016", "\\2017", "\\2018", "\\2019",
-            //"\\202001", "\\202002", "\\202003", "\\202004"
+            "\\2020", 
+            "\\202101", 
+            "\\202102", 
+            "\\202103",
+            "\\202104",
+            "\\202105",
+            "\\202106",
+            "\\202107",
+            "\\202108",
+            "\\202109",
+            "\\202110"
         };
 
         [STAThread]
@@ -47,9 +57,13 @@ namespace FileCopier
 
         private static void CopyAllFiles(MediaDevice device, Dictionary<DateTime, List<VideoDetails>> files, string targetDirectory)
         {
-            foreach (var file in files.Values.SelectMany(v => v))
+            var totalFiles = files.Values.SelectMany(v => v);
+            int counter = 1;
+            int totalCount = totalFiles.Count();
+
+            foreach (var file in totalFiles)
             {
-                Console.WriteLine($"Copying file {file.FileInfo.FullName} to {targetDirectory}\\{file.ActualFileDateTime.Month:00}");
+                Console.WriteLine($"{counter} of {totalCount} : Copying file {file.FileInfo.FullName} to {targetDirectory}\\{file.ActualFileDateTime.Month:00}");
 
                 var targetPath = Path.Combine(targetDirectory, $"{file.ActualFileDateTime.Month:00}");
 
@@ -81,6 +95,8 @@ namespace FileCopier
                         Console.WriteLine($"File {file.FileInfo.FullName} could not be copied {ex.Message}");
                     }
                 }
+
+                counter++;
             }
         }
 
