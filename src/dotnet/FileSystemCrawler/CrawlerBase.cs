@@ -20,6 +20,22 @@ namespace FileSystemCrawler
         public List<string> IgnoredNames { get; set; }
 
         public List<string> IncludedExtensions { get; set; }
+
+        private IEnumerable<int> GetYearMonthCollection(DateTime minDate, DateTime maxDate)
+        {
+            var dates = new List<DateTime>();
+
+            var currentDate = new DateTime(minDate.Year, minDate.Month, 1);
+
+            while(currentDate < maxDate)
+            {
+                dates.Add(currentDate);
+
+                currentDate = currentDate.AddMonths(1);
+            }
+
+            return dates.Select(d => (d.Year * 100) + d.Month);
+        }
         
         public Dictionary<DateTime, List<VideoDetails>> CrawlFileSystem(string startPath, DateTime minDate, DateTime maxDate)
         {
@@ -32,8 +48,10 @@ namespace FileSystemCrawler
             }
 
             Console.WriteLine($"{minDate:MM/dd/yyyy} {maxDate:MM/dd/yyy} Directory: {startPath}");
+
+            var yearMonths = GetYearMonthCollection(minDate, maxDate);
             
-            var fileNames = _assistant.GetFiles(startPath);
+            var fileNames = yearMonths.SelectMany(y => _assistant.GetFiles(startPath, y)).Distinct().ToList();
 
             var counter = 1;
 
@@ -43,6 +61,11 @@ namespace FileSystemCrawler
                 counter++;
 
                 var fileExtension = Path.GetExtension(fileName).ToLower();
+
+                if (string.IsNullOrEmpty(fileExtension))
+                {
+                    continue;
+                }
 
                 //Allow all extensions if empty
                 if (IncludedExtensions.Any() && !IncludedExtensions.Contains(fileExtension))

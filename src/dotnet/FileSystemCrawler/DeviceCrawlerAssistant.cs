@@ -57,9 +57,9 @@ namespace FileSystemCrawler
             return crawlerInfo;
         }
 
-        public IEnumerable<string> GetFiles(string startPath)
+        public IEnumerable<string> GetFiles(string startPath, int yearMonthFilter)
         {
-            return _device.GetFiles(startPath).ToList();
+            return _device.GetFiles(startPath, $"{yearMonthFilter}*.*").ToList();
         }
 
         public bool IsHidden(string directoryPath)
