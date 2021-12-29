@@ -81,6 +81,13 @@ namespace FileSystemCrawler
 
                 var file = _assistant.GetFileInfo(fileName);
 
+                Console.WriteLine($"File {fileName} is {file.Length / 1024} KB");
+
+                if(file.Length < 1)
+                {
+                    Console.WriteLine("Zero length file detected, this may indicate a copy error.");
+                }
+
                 var date = VideoDetails.GetActualFileDateTime(file).Date;
 
                 if (date < minDate || date >= maxDate)
