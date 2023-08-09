@@ -11,6 +11,8 @@ namespace FileSystemCrawler
     {
         private readonly MediaDevice _device;
 
+        private readonly List<MediaFileInfo> knownFiles = new List<MediaFileInfo>();
+
         public DeviceCrawlerAssistant(MediaDevice device)
         {
             _device = device;
@@ -42,24 +44,27 @@ namespace FileSystemCrawler
 
         public CrawlerFileInfo GetFileInfo(string fileName)
         {
+            var knownFile = knownFiles.SingleOrDefault(f => f.FullName == fileName);
+
+            if(knownFile != null)
+            {
+                return CrawlerFileInfo.FromFileInfo(knownFile);
+            }
+
             var fileInfo = _device.GetFileInfo(fileName);
 
-            var crawlerInfo = new CrawlerFileInfo
-            {
-                CreationTime = fileInfo.CreationTime ?? DateTime.MinValue,
-                Extension = Path.GetExtension(fileName),
-                FullName = fileInfo.FullName,
-                LastWriteTime = fileInfo.LastWriteTime ?? DateTime.MinValue,
-                Length = (long)fileInfo.Length,
-                Name = fileInfo.Name
-            };
-
-            return crawlerInfo;
+            return CrawlerFileInfo.FromFileInfo(fileInfo);
         }
 
-        public IEnumerable<string> GetFiles(string startPath)
+        public IEnumerable<string> GetFiles(string startPath, int yearMonthFilter)
         {
-            return _device.GetFiles(startPath).ToList();
+            Console.WriteLine($"Loading files for month {yearMonthFilter}");
+            var filesInDirectory = _device.GetDirectoryInfo(startPath)
+                .EnumerateFiles($"{yearMonthFilter}*.*").ToList();
+
+            knownFiles.AddRange(filesInDirectory);
+
+            return filesInDirectory.Select(f => f.FullName);
         }
 
         public bool IsHidden(string directoryPath)

@@ -8,10 +8,15 @@ namespace FileSystemCrawler
 {
     public class VideoDetails
     {
+        public VideoDetails()
+        {
+
+        }
+
         public VideoDetails(CrawlerFileInfo fileInfo)
         {
             FileInfo = fileInfo;
-            ActualFileDateTime = GetActualFileDateTime(fileInfo);
+            ActualFileDateTime = fileInfo.GetActualFileDateTime();
         }
 
         public VideoDetails(DateTime actualTime)
@@ -25,47 +30,6 @@ namespace FileSystemCrawler
         public CrawlerFileInfo FileInfo { get; set; }
         public DateTime ActualFileDateTime { get; private set; }
         public int PossibleDuplicates { get; set; }
-
-        public static DateTime GetActualFileDateTime(CrawlerFileInfo file)
-        {
-            var fileExtension = Path.GetExtension(file.Name);
-
-            var date = file.LastWriteTime <= file.CreationTime ? file.LastWriteTime : file.CreationTime;
-
-            var name = file.Name.Remove(file.Name.Length - fileExtension.Length);
-
-            if (name.Length >= 15)
-            {
-                if (DateTime.TryParseExact(name.Substring(0, 15), "yyyyMMdd_HHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    if (date != parsedDate)
-                    {
-                        date = parsedDate;
-                    }
-                }
-            }
-            else if (name.Length == 14)
-            {
-                if (DateTime.TryParseExact(name.Substring(0, 14), "yyyyMMddHHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    if (date != parsedDate)
-                    {
-                        date = parsedDate;
-                    }
-                }
-            }
-            else if (name.Length == 12)
-            {
-                if (DateTime.TryParseExact(name.Substring(0, 12), "yyyyMMddHHmm", CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    if (date != parsedDate)
-                    {
-                        date = parsedDate;
-                    }
-                }
-            }
-
-            return date;
-        }
+                
     }
 }

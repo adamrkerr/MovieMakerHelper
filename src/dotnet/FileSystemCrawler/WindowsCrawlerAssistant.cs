@@ -37,10 +37,12 @@ namespace FileSystemCrawler
             return directory.GetDirectories().Select(d => d.FullName).ToList();
         }
 
-        public IEnumerable<string> GetFiles(string startPath)
+        public IEnumerable<string> GetFiles(string startPath, int yearMonthFilter)
         {
             var directory = new DirectoryInfo(startPath);
-            return directory.GetFiles().Select(f => f.FullName).ToList();
+            //return directory.GetFiles($"{yearMonthFilter}*.*").Select(f => f.FullName).ToList();
+            //Sorry, Liskov
+            return directory.GetFiles("*.*").Select(f => f.FullName).ToList();
         }
     }
 }

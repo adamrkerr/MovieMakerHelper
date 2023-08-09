@@ -6,7 +6,7 @@ namespace FileSystemCrawler
     {
         IEnumerable<string> GetDirectories(string startPath);
         CrawlerFileInfo GetFileInfo(string fileName);
-        IEnumerable<string> GetFiles(string startPath);
+        IEnumerable<string> GetFiles(string startPath, int yearMonthFilter);
         bool IsHidden(string directoryPath);
     }
 }
