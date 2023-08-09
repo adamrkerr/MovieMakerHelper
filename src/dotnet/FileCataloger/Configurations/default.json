@@ -1,0 +1,14 @@
+{
+  "StartDate": "20230101",
+  "EndDate": "20230801",
+  "SearchDirectory": "C:\\Razr Backup",
+  "OutputDirectoryFormat": "D:\\Users\\user\\Videos\\Reports\\Razr {0}.csv",
+  "MovieExtensions": [ ".mp4", ".mov", ".mts", ".avi", ".mpg", ".mpeg" ],
+  "IgnoreNames": [
+    "itunes", //can ignore directories
+    "valve",
+    "\\my movies\\",
+    "\\my documents\\my videos\\",
+    "video0071.mp4" //or specific files. this one was corrupted
+  ]
+}
