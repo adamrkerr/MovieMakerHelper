@@ -263,3 +263,4 @@ __pycache__/
 **/TranscoderEnqueuer/ProgramSecrets.cs
 
 /src/dotnet/FileCopier/Configurations/Local
+/src/dotnet/FileCataloger/Configurations/Local

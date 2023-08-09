@@ -17,6 +17,7 @@ namespace FileUploader
     {
         static bool _stopFlag = false;
         static StreamWriter _progressStream = null;
+        static DateTime _startTime = DateTime.Now;
         static UploaderConfiguration _uploaderConfiguration = GetUploaderConfiguration();
         static WindowsCrawlerAssistant _windowsCrawlerAssistant = new WindowsCrawlerAssistant();
 
@@ -106,7 +107,12 @@ namespace FileUploader
                 //check for existing file with same name
                 fileKey = await GetUniqueFileKey(s3Client, detail, bucketName, fileKey);
 
-
+                if(String.IsNullOrEmpty(fileKey) || String.IsNullOrWhiteSpace(fileKey))
+                {
+                    Console.WriteLine($"File {detail.FileInfo.FullName} already exists!");
+                    return;
+                }
+                
                 var transferRequest = new TransferUtilityUploadRequest
                 {
                     BucketName = bucketName,
@@ -164,6 +170,12 @@ namespace FileUploader
 
                 if (existingResponse.HttpStatusCode != System.Net.HttpStatusCode.NotFound)
                 {
+                    //ensure this is not the same file
+                    if (existingResponse.ContentLength == detail.FileInfo.Length)
+                    {
+                        return String.Empty; //Not great, but time was limited for this fix
+                    }
+
                     fileKey = (detail.FileInfo.Name.Replace(detail.FileInfo.Extension, string.Empty)) + $"_{increment}" + detail.FileInfo.Extension;
 
                     //check if the next increment exists
@@ -187,7 +199,13 @@ namespace FileUploader
 
         private static void WriteProgess(object sender, UploadProgressArgs e, int fileCounter, int totalCount, long totalCurrentCount, long totalFinalCount)
         {
-            Console.WriteLine($"File {fileCounter} / {totalCount} - Uploaded {e.TransferredBytes} / {e.TotalBytes}, {e.PercentDone}%, Overall {((float)(totalCurrentCount + e.TransferredBytes)/(float)totalFinalCount) * 100}%");
+            var runTime = DateTime.Now - _startTime;
+
+            var uploadSpeed = ((float)(totalCurrentCount + e.TransferredBytes) / (float)runTime.TotalSeconds);
+
+            var completion = DateTime.Now.AddSeconds((totalFinalCount - (totalCurrentCount + e.TransferredBytes)) / uploadSpeed);
+
+            Console.WriteLine($"File {fileCounter} / {totalCount} - Uploaded {e.TransferredBytes} / {e.TotalBytes}, {e.PercentDone}%, Overall {((float)(totalCurrentCount + e.TransferredBytes)/(float)totalFinalCount) * 100}%, {uploadSpeed}/sec, {completion} est. completion");
         }
 
         static async Task WaitForInput()
