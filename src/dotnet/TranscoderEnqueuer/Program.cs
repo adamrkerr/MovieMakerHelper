@@ -3,6 +3,7 @@ using Amazon.MediaConvert;
 using Amazon.MediaConvert.Model;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -21,28 +22,55 @@ namespace TranscoderEnqueuer
             _transcoderConfiguration = GetTranscoderConfiguration();
 
             int processYear = 0;
+            int processMonth = 0;
+            int processDay = 0;
+            DateTime? processDate = null;
 
-            while (processYear == 0)
+            int endYear = 0;
+            int endMonth = 0;
+            int endDay = 0;
+            DateTime? endDate = null;
+
+            while (processDate == null)
             {
-                Console.WriteLine("For what year do you want to process videos?");
+                Console.WriteLine("Enter a year and month (YYYYMM) or a date range (YYYYMMDD YYYYMMDD) to process videos");
 
                 var yearString = Console.ReadLine();
 
-                int.TryParse(yearString, out processYear);
+                if(yearString.Length == 6)
+                {
+                    int.TryParse(yearString.Substring(0, 4), out processYear);
+                    int.TryParse(yearString.Substring(4, 2), out processMonth);
+                    processDate = new DateTime(processYear, processMonth, 1);
+                }
+                else if (yearString.Length == 17)
+                {
+                    int.TryParse(yearString.Substring(0, 4), out processYear);
+                    int.TryParse(yearString.Substring(4, 2), out processMonth);
+                    int.TryParse(yearString.Substring(6, 2), out processDay);
+                    processDate = new DateTime(processYear, processMonth, processDay);
+
+                    int.TryParse(yearString.Substring(9, 4), out endYear);
+                    int.TryParse(yearString.Substring(13, 2), out endMonth);
+                    int.TryParse(yearString.Substring(15, 2), out endDay);
+                    endDate = new DateTime(endYear, endMonth, endDay);
+                }
+                else
+                {
+                    Console.WriteLine("Invalid date range, please try again.");
+                }
+
             }
+            List<VideoSummary> files = new List<VideoSummary>();
 
-            int processMonth = 0;
-
-            while (processMonth == 0)
+            if (endDate == null)
             {
-                Console.WriteLine("For what month do you want to process videos? (1-12)");
-
-                var monthString = Console.ReadLine();
-
-                int.TryParse(monthString, out processMonth);
+                files = LoadFilesForMonth(processDate.Value);
             }
-
-            var files = LoadFilesForMonth(processYear, processMonth);
+            else
+            {
+                files = LoadFilesForRange(processDate.Value, endDate.Value);
+            }
 
             Console.WriteLine("What do you want to do?");
             Console.WriteLine("1) Subtitle");
@@ -72,13 +100,13 @@ namespace TranscoderEnqueuer
                     GenerateSubtitleFiles(files);
                     break;
                 case TranscoderFunctions.Compile:
-                    EnqueueConversion(files);
+                    EnqueueConversion(files, processDate.Value, endDate);
                     break;
                 case TranscoderFunctions.SubtitleAndCompile:
                     if (GenerateSubtitleFiles(files))
                     {
                         //only do this if above was ok
-                        EnqueueConversion(files);
+                        EnqueueConversion(files, processDate.Value, endDate);
                     }
                     break;
                 case TranscoderFunctions.Glacierize:
@@ -98,7 +126,7 @@ namespace TranscoderEnqueuer
                 Main(args);
             }
         }
-
+        
         private static void Glacierize(List<VideoSummary> files)
         {
             Console.WriteLine($"Enter \"Y\" to glacierize {files.Count} files. Enter any other key to return.");
@@ -232,10 +260,11 @@ namespace TranscoderEnqueuer
 
         const string CAPTIONS_SELECTOR = "Captions Selector 1";
 
-        private static void EnqueueConversion(List<VideoSummary> files)
+        private static void EnqueueConversion(List<VideoSummary> files, DateTime processDate, DateTime? endDate)
         {
-            var minDate = files.Select(f => f.ActualFileDateTime).Min();
-            var jobRequest = GenerateJobRequest(minDate);
+            var jobRequest = GenerateJobRequest(processDate, endDate);
+
+            jobRequest = AppendAdditionalVideoOutputs(jobRequest);
 
             var previousDate = DateTime.MinValue;
 
@@ -352,8 +381,40 @@ namespace TranscoderEnqueuer
             Console.WriteLine("Video generation complete.");
         }
 
-        private static CreateJobRequest GenerateJobRequest(DateTime minDate)
+        private static CreateJobRequest AppendAdditionalVideoOutputs(CreateJobRequest jobRequest)
         {
+            //var originalOuput = jobRequest.Settings.OutputGroups[0].Outputs[0];
+
+            //var output2 = CloneOutput(originalOuput);
+            //output2.NameModifier = "_1080_24";
+            //output2.Preset = "Custom-Generic_Hd_Mp4_Av1_Aac_16x9_1920x1080p_24Hz_10Mbps_Qvbr_Vq9";
+
+            //var output3 = CloneOutput(originalOuput);
+            //output3.NameModifier = "_1080_60";
+            //output3.Preset = "System-Generic_Hd_Mp4_Av1_Aac_16x9_1920x1080p_60Hz_5Mbps_Qvbr_Vq7";
+
+            //jobRequest.Settings.OutputGroups[0].Outputs.Add(output2);
+            //jobRequest.Settings.OutputGroups[0].Outputs.Add(output3);
+
+            return jobRequest;
+        }
+
+        private static Output CloneOutput(Output originalOuput)
+        {
+            //clone via serialization
+            var serialized = JsonConvert.SerializeObject(originalOuput);
+            return JsonConvert.DeserializeObject<Output>(serialized);
+        }
+
+        private static CreateJobRequest GenerateJobRequest(DateTime minDate, DateTime? maxDate)
+        {
+            var destination = $"s3://{_transcoderConfiguration.DestinationBucketRoot}/{minDate.Year}/{minDate:yyyyMM}";
+
+            if(maxDate != null)
+            {
+                destination = $"s3://{_transcoderConfiguration.DestinationBucketRoot}/{minDate.Year}/{minDate:yyyyMMdd}_{maxDate:yyyyMMdd}";
+            }
+
             var jobRequest = new CreateJobRequest()
             {
                 //Queue
@@ -371,14 +432,14 @@ namespace TranscoderEnqueuer
                                 Type = OutputGroupType.FILE_GROUP_SETTINGS,
                                 FileGroupSettings = new FileGroupSettings
                                 {
-                                    Destination = $"s3://{_transcoderConfiguration.DestinationBucketRoot}/{minDate.Year}/{minDate:yyyyMM}"
+                                    Destination = destination
                                 }
                             },
                             Outputs = new List<Output>
                             {
                                 new Output
-                                {
-                                    Preset = "System-Generic_Hd_Mp4_Avc_Aac_16x9_1920x1080p_24Hz_6Mbps", //may need to adjust this
+                                {                                    
+                                    Preset="System-Generic_Hd_Mp4_Avc_Aac_16x9_Sdr_1920x1080p_30Hz_10Mbps_Qvbr_Vq9",
                                     CaptionDescriptions = new List<CaptionDescription>
                                     {
                                         new CaptionDescription
@@ -442,7 +503,25 @@ namespace TranscoderEnqueuer
             return input;
         }
 
-        static List<VideoSummary> LoadFilesForMonth(int year, int month)
+
+        private static List<VideoSummary> LoadFilesForRange(DateTime processDate, DateTime endDate)
+        {
+            if(processDate.Year == endDate.Year && processDate.Month == endDate.Month)
+            {
+                var summaries = LoadFilesForMonth(processDate)
+                                .Where(v => v.ActualFileDateTime >= processDate
+                                    && v.ActualFileDateTime < endDate.AddDays(1)) //filter out other dates
+                                .ToList();
+
+                return summaries;
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        static List<VideoSummary> LoadFilesForMonth(DateTime processDate)
         {
             using (var awsClient = new AmazonS3Client(GetCredentials(), GetConfig()))
             {
@@ -450,7 +529,7 @@ namespace TranscoderEnqueuer
                 var listRequest = new ListObjectsV2Request
                 {
                     BucketName = _transcoderConfiguration.ArchiveBucketRoot,
-                    Prefix = $"{year}/{month}/"
+                    Prefix = $"{processDate.Year}/{processDate.Month}/"
                 };
 
                 var objects = awsClient.ListObjectsV2(listRequest);
