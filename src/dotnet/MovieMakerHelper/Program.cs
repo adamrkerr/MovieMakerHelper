@@ -33,7 +33,7 @@ namespace MovieMakerHelper
             var currentEndTime = _startDate.AddMonths(1);
             //var currentEndTime = _endDate;
 
-            var uniqueFileCrawler = new UniqueFileCrawler(_ignoreNames, _movieExtensions);
+            var uniqueFileCrawler = new UniqueFileCrawler(new WindowsCrawlerAssistant(), _ignoreNames, _movieExtensions);
 
             while (currentEndTime <= _endDate)
             {
