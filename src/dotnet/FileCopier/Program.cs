@@ -224,7 +224,7 @@ namespace FileCopier
 
                 if (File.Exists(targetPath))
                 {
-                    var breaker = "we have a problem"; //figure out what to do about this...
+                    Console.WriteLine($"Skipping duplicate file {targetPath}");
                 }
                 else
                 {
