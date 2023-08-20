@@ -18,57 +18,81 @@ namespace FileCopier
         {
             CopyConfiguration configuration = LoadCopyConfiguration();
 
-            var devices = MediaDevice.GetDevices();
-
-            var device = devices.Single(s => s.FriendlyName.Trim() == configuration.DeviceName);
-
-            device.Connect();
-
-            using(device)
-            using (var assistant = new DeviceCrawlerAssistant(device))
+            //see if this is a media device, such as a phone or tablet
+            if (!String.IsNullOrWhiteSpace(configuration.DeviceName))
             {
-                var uniqueFileCrawler = new UniqueFileCrawler(assistant, configuration.IgnoreNames, new List<string>());
+                var devices = MediaDevice.GetDevices();
 
-                DateTime _startDate = GetStartDate(configuration.TargetDirectory);
-                DateTime _endDate = GetEndDate();
+                var device = devices.Single(s => s.FriendlyName.Trim() == configuration.DeviceName);
 
-                var tempFileName = GetTempFileName(configuration.DeviceName);
-                Dictionary<DateTime, List<VideoDetails>> files = null;
+                device.Connect();
 
-                //check if temp json exists
-                if (File.Exists(tempFileName))
+                using (device)
+                using (var assistant = new DeviceCrawlerAssistant(device))
                 {
-                    //ask if should load from file
-                    Console.WriteLine($"Found an existing file list. Enter Y to use the existing list.");
-
-                    var choice = Console.ReadLine();
-
-                    if (choice.Equals("Y", StringComparison.CurrentCultureIgnoreCase))
+                    Action<string, string> copyFunction = (string filePath, string targetPath) =>
                     {
-                        files = LoadTempFileList(tempFileName, _startDate, _endDate);
-                    }
-                    else
-                    {
-                        files = uniqueFileCrawler.CrawlFileSystem(configuration.SearchDirectory, _startDate, _endDate);
-                    }
+                        CopyFileFromDevice(filePath, targetPath, device);
+                    };
+
+                    PerformFileCopy(configuration, assistant, copyFunction);
+                }
+            } //if not, it may be a hard drive
+            else if (Directory.Exists(configuration.SearchDirectory))
+            {
+                var assistant = new WindowsCrawlerAssistant();
+                PerformFileCopy(configuration, assistant, CopyFileFromWindows);
+            }
+            else
+            {
+                Console.WriteLine("Could not find any directory or files to copy. Press any key to exit.");
+                Console.ReadKey();
+            }
+        }
+
+        private static void PerformFileCopy(CopyConfiguration configuration, ICrawlerAssistant assistant, Action<string, string> copyFunction)
+        {
+            var uniqueFileCrawler = new UniqueFileCrawler(assistant, configuration.IgnoreNames, new List<string>());
+
+            DateTime _startDate = GetStartDate(configuration.TargetDirectory);
+            DateTime _endDate = GetEndDate();
+
+            var tempFileName = GetTempFileName(configuration.DeviceName);
+            Dictionary<DateTime, List<VideoDetails>> files = null;
+
+            //check if temp json exists
+            if (File.Exists(tempFileName))
+            {
+                //ask if should load from file
+                Console.WriteLine($"Found an existing file list. Enter Y to use the existing list.");
+
+                var choice = Console.ReadLine();
+
+                if (choice.Equals("Y", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    files = LoadTempFileList(tempFileName, _startDate, _endDate);
                 }
                 else
                 {
                     files = uniqueFileCrawler.CrawlFileSystem(configuration.SearchDirectory, _startDate, _endDate);
                 }
-
-                //dump files to temp json
-                SaveTempFileList(tempFileName, files);
-
-                CopyAllFiles(device, files, configuration.TargetDirectory);
-
-                Console.WriteLine("Finished copying files.");
-
-                //delete temp file
-                File.Delete(tempFileName);
-
-                Console.ReadKey();
             }
+            else
+            {
+                files = uniqueFileCrawler.CrawlFileSystem(configuration.SearchDirectory, _startDate, _endDate);
+            }
+
+            //dump files to temp json
+            SaveTempFileList(tempFileName, files);
+
+            CopyAllFiles(files, configuration.TargetDirectory, copyFunction);
+
+            Console.WriteLine("Finished copying files.");
+
+            //delete temp file
+            File.Delete(tempFileName);
+
+            Console.ReadKey();
         }
 
         private static CopyConfiguration LoadCopyConfiguration()
@@ -203,7 +227,7 @@ namespace FileCopier
             return dateResult;
         }
 
-        private static void CopyAllFiles(MediaDevice device, Dictionary<DateTime, List<VideoDetails>> files, string targetDirectory)
+        private static void CopyAllFiles(Dictionary<DateTime, List<VideoDetails>> files, string targetDirectory, Action<string, string> copyFunction)
         {
             var allFiles = files.Values.SelectMany(v => v);
             var totalFileCount = allFiles.Count();
@@ -230,13 +254,14 @@ namespace FileCopier
                 {
                     try
                     {
+                        copyFunction(file.FileInfo.FullName, targetPath);
                         //    File.Copy(file.FileInfo.FullName, targetPath);
-                        using (MemoryStream memoryStream = new System.IO.MemoryStream())
-                        {
-                            device.DownloadFile(file.FileInfo.FullName, memoryStream);
-                            memoryStream.Position = 0;
-                            WriteSreamToDisk(targetPath, memoryStream);
-                        }
+                        //using (MemoryStream memoryStream = new System.IO.MemoryStream())
+                        //{
+                        //    device.DownloadFile(file.FileInfo.FullName, memoryStream);
+                        //    memoryStream.Position = 0;
+                        //    WriteSreamToDisk(targetPath, memoryStream);
+                        //}
                     }
                     catch(Exception ex)
                     {
@@ -245,6 +270,20 @@ namespace FileCopier
                 }
 
                 fileCounter++;
+            }
+        }
+        static void CopyFileFromWindows(string filePath, string targetPath)
+        {
+            File.Copy(filePath, targetPath, false);
+        }
+
+        static void CopyFileFromDevice(string filePath, string targetPath, MediaDevice device)
+        {
+            using (MemoryStream memoryStream = new System.IO.MemoryStream())
+            {
+                device.DownloadFile(filePath, memoryStream);
+                memoryStream.Position = 0;
+                WriteSreamToDisk(targetPath, memoryStream);
             }
         }
 
