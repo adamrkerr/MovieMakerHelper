@@ -226,6 +226,11 @@ namespace FileUploader
                 {
                     var line = await reader.ReadLineAsync();
 
+                    if (String.IsNullOrEmpty(line))
+                    {
+                        continue;
+                    }
+
                     var cells = line.Split(new[] { "," }, StringSplitOptions.None)
                         .Select(s => s.Trim('"'))
                         .ToArray();
